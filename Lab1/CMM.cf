@@ -6,8 +6,21 @@ terminator Func "" ;
 
 comment "//";
 comment "/*" "*/";
-
+comment "#" ; 
 FDef. Func::= Type Id  Argument Body;
+
+TDouble. Type ::= "double" ;
+TBool.   Type ::= "bool" ; 
+TInt.    Type ::= "int" ; 
+TVoid.   Type ::= "void" ;
+TString. Type ::= "String" ; 
+
+EInt.  Exp15 ::= Integer;
+EDouble. Exp15 ::= Double;
+EString. Exp15 ::= String ;
+ETrue. Exp15 ::= "true";
+EFalse. Exp15 ::= "false";
+EId. Exp15 ::= Id;
 
 
 
@@ -15,17 +28,22 @@ FArgument. Argument ::= "(" [Args] ")";
 
 FArgs. Args ::= Type Id;
 
-seperator Args ",";
+FBody. Body ::= "{"  [Stm]  "}";
+
+separator Args ",";
 
 SExp. Stm ::= Exp ";";
 SDecl. Stm ::= Type Id ";";
 SDecls. Stm ::= Type Id "," [Id] ";";
 SInit. Stm ::= Type Id "=" Exp ";";
+SRet. Stm ::= "return" Exp ";";
+SWhile. Stm ::= "while" "(" Exp ")" Stm;
+SIf. Stm ::= "if" "(" Exp ")" Stm "else" Stm ;
+SBlock. Stm ::= "{" [Stm] "}" ; 
 
 
 
 terminator Stm "";
 
-FBody. Body ::= "{"  [Stm]  "}";
 
 
