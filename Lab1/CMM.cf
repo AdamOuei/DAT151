@@ -1,0 +1,31 @@
+-- Programs are a sequence of functions
+
+Prg. Program ::= [Func];
+
+terminator Func "" ;
+
+comment "//";
+comment "/*" "*/";
+
+FDef. Func::= Type Id  Argument Body;
+
+
+
+FArgument. Argument ::= "(" [Args] ")";
+
+FArgs. Args ::= Type Id;
+
+seperator Args ",";
+
+SExp. Stm ::= Exp ";";
+SDecl. Stm ::= Type Id ";";
+SDecls. Stm ::= Type Id "," [Id] ";";
+SInit. Stm ::= Type Id "=" Exp ";";
+
+
+
+terminator Stm "";
+
+FBody. Body ::= "{"  [Stm]  "}";
+
+
