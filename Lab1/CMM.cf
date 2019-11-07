@@ -1,5 +1,3 @@
--- Programs are a sequence of functions
-
 Prg. Program ::= [Func];
 
 terminator Func "" ;
