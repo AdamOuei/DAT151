@@ -22,7 +22,11 @@ ETrue. Exp15 ::= "true";
 EFalse. Exp15 ::= "false";
 EId. Exp15 ::= Id;
 
+coercions Exp 15;
+
 token Id (letter(letter | digit | '_')*);
+
+separator nonempty Id ",";
 
 FArgument. Argument ::= "(" [Args] ")";
 
@@ -33,13 +37,13 @@ FBody. Body ::= "{"  [Stm]  "}";
 separator Args ",";
 
 SExp. Stm ::= Exp ";";
-SDecl. Stm ::= Type Id ";";
-SDecls. Stm ::= Type Id "," [Id] ";";
+SDecls. Stm ::= Type [Id]  ";";
 SInit. Stm ::= Type Id "=" Exp ";";
 SRet. Stm ::= "return" Exp ";";
 SWhile. Stm ::= "while" "(" Exp ")" Stm;
 SIf. Stm ::= "if" "(" Exp ")" Stm "else" Stm ;
 SBlock. Stm ::= "{" [Stm] "}" ; 
+
 
 
 
