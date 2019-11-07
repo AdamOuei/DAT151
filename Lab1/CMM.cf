@@ -38,7 +38,7 @@ ESub. Exp11 ::= Exp11 "-" Exp12 ;
 
 ELess. Exp9 ::= Exp9 "<" Exp11 ;
 EGre. Exp9 ::= Exp9 ">" Exp11 ;
-ELeq. Exp9 ::= Exp9 "=<" Exp11 ;
+ELeq. Exp9 ::= Exp9 "<=" Exp11 ;
 EGeq. Exp9 ::= Exp9 ">=" Exp11 ;
 
 EEqua. Exp8 ::= Exp8 "==" Exp9 ;
