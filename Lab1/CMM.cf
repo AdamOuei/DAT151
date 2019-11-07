@@ -22,7 +22,7 @@ ETrue. Exp15 ::= "true";
 EFalse. Exp15 ::= "false";
 EId. Exp15 ::= Id;
 
-
+token Id (letter(letter | digit | '_')*);
 
 FArgument. Argument ::= "(" [Args] ")";
 
