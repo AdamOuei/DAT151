@@ -21,8 +21,40 @@ EString. Exp15 ::= String ;
 ETrue. Exp15 ::= "true";
 EFalse. Exp15 ::= "false";
 EId. Exp15 ::= Id;
+ECall. Exp15 ::= Id "(" [Exp] ")" ;
+
+EInc. Exp14 ::= Exp14 "++" ;
+EDec. Exp14 ::= Exp14 "--" ;
+
+EInc2. Exp13 ::= "++" Exp13 ;
+EDec2. Exp13 ::= "--" Exp13 ;
+ENeg. Exp13 ::= "-" Exp13 ;
+
+EMul. Exp12 ::= Exp12 "*" Exp13 ;
+EDiv. Exp12 ::= Exp12 "/" Exp13 ;
+
+EAdd. Exp11 ::= Exp11 "+" Exp12 ;
+ESub. Exp11 ::= Exp11 "-" Exp12 ;
+
+ELess. Exp9 ::= Exp9 "<" Exp11 ;
+EGre. Exp9 ::= Exp9 ">" Exp11 ;
+ELeq. Exp9 ::= Exp9 "=<" Exp11 ;
+EGeq. Exp9 ::= Exp9 ">=" Exp11 ;
+
+EEqua. Exp8 ::= Exp8 "==" Exp9 ;
+EIneq. Exp8 ::= Exp8 "!=" Exp9 ;
+
+EConj. Exp4 ::= Exp4 "&&" Exp8 ;
+
+EDisj. Exp3 ::= Exp3 "||" Exp4 ;
+
+EAss. Exp2 ::= Exp3 "=" Exp2 ;
+
+internal ETyped. Exp15 ::= "(" Exp ":" Type ")" ;
 
 coercions Exp 15;
+
+separator Exp "," ;
 
 token Id (letter(letter | digit | '_')*);
 
