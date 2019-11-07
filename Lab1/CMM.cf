@@ -13,7 +13,7 @@ TDouble. Type ::= "double" ;
 TBool.   Type ::= "bool" ; 
 TInt.    Type ::= "int" ; 
 TVoid.   Type ::= "void" ;
-TString. Type ::= "String" ; 
+TString. Type ::= "string" ; 
 
 EInt.  Exp15 ::= Integer;
 EDouble. Exp15 ::= Double;
