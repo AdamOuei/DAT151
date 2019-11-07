@@ -1,17 +1,33 @@
 Prg. Program ::= [Func];
 
-terminator Func "" ;
-
-comment "//";
-comment "/*" "*/";
-comment "#" ; 
 FDef. Func::= Type Id  Argument Body;
+FArgument. Argument ::= "(" [Args] ")";
+FArgs. Args ::= Type Id;
+FBody. Body ::= "{"  [Stm]  "}";
+
+separator Args ",";
+
+terminator Func "" ;
 
 TDouble. Type ::= "double" ;
 TBool.   Type ::= "bool" ; 
 TInt.    Type ::= "int" ; 
 TVoid.   Type ::= "void" ;
 TString. Type ::= "string" ; 
+
+token Id (letter(letter | digit | '_')*);
+
+separator nonempty Id ",";
+
+SExp. Stm ::= Exp ";";
+SDecls. Stm ::= Type [Id]  ";";
+SInit. Stm ::= Type Id "=" Exp ";";
+SRet. Stm ::= "return" Exp ";";
+SWhile. Stm ::= "while" "(" Exp ")" Stm;
+SIf. Stm ::= "if" "(" Exp ")" Stm "else" Stm ;
+SBlock. Stm ::= "{" [Stm] "}" ; 
+
+terminator Stm "";
 
 EInt.  Exp15 ::= Integer;
 EDouble. Exp15 ::= Double;
@@ -54,30 +70,6 @@ coercions Exp 15;
 
 separator Exp "," ;
 
-token Id (letter(letter | digit | '_')*);
-
-separator nonempty Id ",";
-
-FArgument. Argument ::= "(" [Args] ")";
-
-FArgs. Args ::= Type Id;
-
-FBody. Body ::= "{"  [Stm]  "}";
-
-separator Args ",";
-
-SExp. Stm ::= Exp ";";
-SDecls. Stm ::= Type [Id]  ";";
-SInit. Stm ::= Type Id "=" Exp ";";
-SRet. Stm ::= "return" Exp ";";
-SWhile. Stm ::= "while" "(" Exp ")" Stm;
-SIf. Stm ::= "if" "(" Exp ")" Stm "else" Stm ;
-SBlock. Stm ::= "{" [Stm] "}" ; 
-
-
-
-
-terminator Stm "";
-
-
-
+comment "//";
+comment "/*" "*/";
+comment "#" ; 
