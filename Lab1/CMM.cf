@@ -48,13 +48,13 @@ EDiv. Exp6 ::= Exp6 "/" Exp7 ;
 EAdd. Exp5 ::= Exp5 "+" Exp6 ;
 ESub. Exp5 ::= Exp5 "-" Exp6 ;
 
-ELess. Exp4 ::= Exp4 "<" Exp4 ;
-EGre. Exp4 ::= Exp4 ">" Exp4 ;
-ELeq. Exp4 ::= Exp4 "<=" Exp4 ;
-EGeq. Exp4 ::= Exp4 ">=" Exp4 ;
+ELess. Exp4 ::= Exp5 "<" Exp5 ;
+EGre. Exp4 ::= Exp5 ">" Exp5 ;
+ELeq. Exp4 ::= Exp5 "<=" Exp5 ;
+EGeq. Exp4 ::= Exp5 ">=" Exp5 ;
 
-EEqua. Exp4 ::= Exp4 "==" Exp4 ;
-EIneq. Exp4 ::= Exp4 "!=" Exp4 ;
+EEqua. Exp4 ::= Exp5 "==" Exp5 ;
+EIneq. Exp4 ::= Exp5 "!=" Exp4 ;
 
 EConj. Exp3 ::= Exp3 "&&" Exp4 ;
 
