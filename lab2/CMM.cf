@@ -30,7 +30,6 @@ terminator Stm "";
 
 EInt.  Exp7 ::= Integer ;
 EDouble. Exp7 ::= Double ;
-EString. Exp7 ::= String ;
 ETrue. Exp7 ::= "true" ;
 EFalse. Exp7 ::= "false" ;
 EId. Exp7 ::= Id ;
@@ -54,7 +53,7 @@ ELeq. Exp4 ::= Exp5 "<=" Exp5 ;
 EGeq. Exp4 ::= Exp5 ">=" Exp5 ;
 
 EEqua. Exp4 ::= Exp5 "==" Exp5 ;
-EIneq. Exp4 ::= Exp5 "!=" Exp4 ;
+EIneq. Exp4 ::= Exp5 "!=" Exp5 ;
 
 EConj. Exp3 ::= Exp3 "&&" Exp4 ;
 
