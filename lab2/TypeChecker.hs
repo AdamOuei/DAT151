@@ -18,18 +18,22 @@ type Sig = Map Id ([Type],Type) -- function type signature
 type Context = Map Id Type -- variables with their types
 
 lookupVar :: Env -> Id -> Err Type
-lookupVar (sig, stack) id = 
-    
-                do
-                varType <- head listOfTypes
-                where maybeList = map lookup id stack
-                      case (catMaybes maybeList) of
-                        [] -> Err
-                        [Just x:_] -> x
-
+lookupVar (_, stack) id = 
+          case catMaybes maybeList of
+            [] -> Bad "No variable found"
+            [Just x:_] -> Ok x
+            where maybeList = map lookup id stack
+            
 
 lookupFun :: Env -> Id -> Err ([Type],Type)
+lookupFun (sig, _) id = 
+            case lookup id sig of
+                Nothing -> Bad "No function found"
+                Just pair -> Ok pair
+
 updateVar :: Env -> Id -> Type -> Err Env
+updateVar (sig, stack) 
+
 updateFun :: Env -> Id -> ([Type],Type) -> Err Env
 newBlock :: Env -> Env
 emptyEnv :: Env
