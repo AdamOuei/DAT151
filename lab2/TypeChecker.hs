@@ -19,9 +19,13 @@ type Context = Map Id Type -- variables with their types
 
 lookupVar :: Env -> Id -> Err Type
 lookupVar (sig, stack) id = 
-
-                        where maybeList = map lookup id stack
-                              listOfTypes = catMaybes maybeList
+    
+                do
+                varType <- head listOfTypes
+                where maybeList = map lookup id stack
+                      case (catMaybes maybeList) of
+                        [] -> Err
+                        [Just x:_] -> x
 
 
 lookupFun :: Env -> Id -> Err ([Type],Type)
