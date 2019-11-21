@@ -1,12 +1,73 @@
-PDefs.   Program ::= [Def] ;
+Prg. Program ::= [Func];
 
-DFun.    Def     ::= "int" "main" "(" ")" "{" "}" ;  -- TODO: FIX ME!
-terminator Def "" ;
+FDef. Func::= Type Id  Argument Body;
+FArgument. Argument ::= "(" [Args] ")";
+FArgs. Args ::= Type Id;
+FBody. Body ::= "{"  [Stm]  "}";
 
--- ... TODO grammar ...
+separator Args ",";
 
--- Comment syntax
+terminator Func "" ;
 
-comment "/*" "*/" ;
-comment "//" ;
-comment "#" ;
+TDouble. Type ::= "double" ;
+TBool.   Type ::= "bool" ; 
+TInt.    Type ::= "int" ; 
+TVoid.   Type ::= "void" ;
+
+token Id (letter(letter | digit | '_')*);
+
+separator nonempty Id ",";
+
+SExp. Stm ::= Exp ";";
+SDecls. Stm ::= Type [Id]  ";";
+SInit. Stm ::= Type Id "=" Exp ";";
+SRet. Stm ::= "return" Exp ";";
+SWhile. Stm ::= "while" "(" Exp ")" Stm;
+SIf. Stm ::= "if" "(" Exp ")" Stm "else" Stm ;
+SBlock. Stm ::= "{" [Stm] "}" ; 
+
+terminator Stm "";
+
+EInt.  Exp7 ::= Integer ;
+EDouble. Exp7 ::= Double ;
+EString. Exp7 ::= String ;
+ETrue. Exp7 ::= "true" ;
+EFalse. Exp7 ::= "false" ;
+EId. Exp7 ::= Id ;
+ECall. Exp7 ::= Id "(" [Exp] ")" ;
+
+EInc. Exp7 ::= Id "++" ;
+EDec. Exp7 ::= Id "--" ;
+
+EInc2. Exp7 ::= "++" Id ;
+EDec2. Exp7 ::= "--" Id ;
+
+EMul. Exp6 ::= Exp6 "*" Exp7 ;
+EDiv. Exp6 ::= Exp6 "/" Exp7 ;
+
+EAdd. Exp5 ::= Exp5 "+" Exp6 ;
+ESub. Exp5 ::= Exp5 "-" Exp6 ;
+
+ELess. Exp4 ::= Exp5 "<" Exp5 ;
+EGre. Exp4 ::= Exp5 ">" Exp5 ;
+ELeq. Exp4 ::= Exp5 "<=" Exp5 ;
+EGeq. Exp4 ::= Exp5 ">=" Exp5 ;
+
+EEqua. Exp4 ::= Exp5 "==" Exp5 ;
+EIneq. Exp4 ::= Exp5 "!=" Exp4 ;
+
+EConj. Exp3 ::= Exp3 "&&" Exp4 ;
+
+EDisj. Exp2 ::= Exp2 "||" Exp3 ;
+
+EAss. Exp1 ::= Id "=" Exp1 ;
+
+internal ETyped. Exp7 ::= "(" Exp ":" Type ")" ;
+
+coercions Exp 7;
+
+separator Exp "," ;
+
+comment "//";
+comment "/*" "*/";
+comment "#" ; 

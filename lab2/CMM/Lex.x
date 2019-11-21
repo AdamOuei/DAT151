@@ -21,7 +21,7 @@ $i = [$l $d _ ']     -- identifier character
 $u = [. \n]          -- universal: any character
 
 @rsyms =    -- symbols and non-identifier-like reserved words
-   \( | \) | \{ | \}
+   \( | \) | \{ | \} | \, | \; | \= | \+ \+ | \- \- | \* | \/ | \+ | \- | \< | \> | \< \= | \> \= | \= \= | \! \= | \& \& | \| \|
 
 :-
 "//" [.]* ; -- Toss single line comments
@@ -31,13 +31,18 @@ $u = [. \n]          -- universal: any character
 $white+ ;
 @rsyms
     { tok (\p s -> PT p (eitherResIdent (TV . share) s)) }
+$l ($l | $d | \_)*
+    { tok (\p s -> PT p (eitherResIdent (T_Id . share) s)) }
 
 $l $i*
     { tok (\p s -> PT p (eitherResIdent (TV . share) s)) }
+\" ([$u # [\" \\ \n]] | (\\ (\" | \\ | \' | n | t | r | f)))* \"
+    { tok (\p s -> PT p (TL $ share $ unescapeInitTail s)) }
 
-
-
-
+$d+
+    { tok (\p s -> PT p (TI $ share s))    }
+$d+ \. $d+ (e (\-)? $d+)?
+    { tok (\p s -> PT p (TD $ share s)) }
 
 {
 
@@ -54,6 +59,7 @@ data Tok =
  | TV !String         -- identifiers
  | TD !String         -- double precision float literals
  | TC !String         -- character literals
+ | T_Id !String
 
  deriving (Eq,Show,Ord)
 
@@ -91,6 +97,7 @@ prToken t = case t of
   PT _ (TD s)   -> s
   PT _ (TC s)   -> s
   Err _         -> "#error"
+  PT _ (T_Id s) -> s
 
 
 data BTree = N | B String Tok BTree BTree deriving (Show)
@@ -104,7 +111,7 @@ eitherResIdent tv s = treeFind resWords
                               | s == a = t
 
 resWords :: BTree
-resWords = b "main" 4 (b ")" 2 (b "(" 1 N N) (b "int" 3 N N)) (b "}" 6 (b "{" 5 N N) N)
+resWords = b "==" 16 (b "," 8 (b ")" 4 (b "&&" 2 (b "!=" 1 N N) (b "(" 3 N N)) (b "+" 6 (b "*" 5 N N) (b "++" 7 N N))) (b ";" 12 (b "--" 10 (b "-" 9 N N) (b "/" 11 N N)) (b "<=" 14 (b "<" 13 N N) (b "=" 15 N N)))) (b "int" 24 (b "double" 20 (b ">=" 18 (b ">" 17 N N) (b "bool" 19 N N)) (b "false" 22 (b "else" 21 N N) (b "if" 23 N N))) (b "while" 28 (b "true" 26 (b "return" 25 N N) (b "void" 27 N N)) (b "||" 30 (b "{" 29 N N) (b "}" 31 N N))))
    where b s n = let bs = id s
                   in B bs (TS bs n)
 

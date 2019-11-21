@@ -88,16 +88,98 @@ instance Print Integer where
 instance Print Double where
   prt _ x = doc (shows x)
 
+instance Print CMM.Abs.Id where
+  prt _ (CMM.Abs.Id i) = doc (showString i)
+  prtList _ [x] = concatD [prt 0 x]
+  prtList _ (x:xs) = concatD [prt 0 x, doc (showString ","), prt 0 xs]
+
 instance Print CMM.Abs.Program where
   prt i e = case e of
-    CMM.Abs.PDefs defs -> prPrec i 0 (concatD [prt 0 defs])
+    CMM.Abs.Prg funcs -> prPrec i 0 (concatD [prt 0 funcs])
 
-instance Print CMM.Abs.Def where
+instance Print CMM.Abs.Func where
   prt i e = case e of
-    CMM.Abs.DFun -> prPrec i 0 (concatD [doc (showString "int"), doc (showString "main"), doc (showString "("), doc (showString ")"), doc (showString "{"), doc (showString "}")])
+    CMM.Abs.FDef type_ id argument body -> prPrec i 0 (concatD [prt 0 type_, prt 0 id, prt 0 argument, prt 0 body])
   prtList _ [] = concatD []
   prtList _ (x:xs) = concatD [prt 0 x, prt 0 xs]
 
-instance Print [CMM.Abs.Def] where
+instance Print CMM.Abs.Argument where
+  prt i e = case e of
+    CMM.Abs.FArgument argss -> prPrec i 0 (concatD [doc (showString "("), prt 0 argss, doc (showString ")")])
+
+instance Print CMM.Abs.Args where
+  prt i e = case e of
+    CMM.Abs.FArgs type_ id -> prPrec i 0 (concatD [prt 0 type_, prt 0 id])
+  prtList _ [] = concatD []
+  prtList _ [x] = concatD [prt 0 x]
+  prtList _ (x:xs) = concatD [prt 0 x, doc (showString ","), prt 0 xs]
+
+instance Print CMM.Abs.Body where
+  prt i e = case e of
+    CMM.Abs.FBody stms -> prPrec i 0 (concatD [doc (showString "{"), prt 0 stms, doc (showString "}")])
+
+instance Print [CMM.Abs.Args] where
+  prt = prtList
+
+instance Print [CMM.Abs.Func] where
+  prt = prtList
+
+instance Print CMM.Abs.Type where
+  prt i e = case e of
+    CMM.Abs.TDouble -> prPrec i 0 (concatD [doc (showString "double")])
+    CMM.Abs.TBool -> prPrec i 0 (concatD [doc (showString "bool")])
+    CMM.Abs.TInt -> prPrec i 0 (concatD [doc (showString "int")])
+    CMM.Abs.TVoid -> prPrec i 0 (concatD [doc (showString "void")])
+
+instance Print [CMM.Abs.Id] where
+  prt = prtList
+
+instance Print CMM.Abs.Stm where
+  prt i e = case e of
+    CMM.Abs.SExp exp -> prPrec i 0 (concatD [prt 0 exp, doc (showString ";")])
+    CMM.Abs.SDecls type_ ids -> prPrec i 0 (concatD [prt 0 type_, prt 0 ids, doc (showString ";")])
+    CMM.Abs.SInit type_ id exp -> prPrec i 0 (concatD [prt 0 type_, prt 0 id, doc (showString "="), prt 0 exp, doc (showString ";")])
+    CMM.Abs.SRet exp -> prPrec i 0 (concatD [doc (showString "return"), prt 0 exp, doc (showString ";")])
+    CMM.Abs.SWhile exp stm -> prPrec i 0 (concatD [doc (showString "while"), doc (showString "("), prt 0 exp, doc (showString ")"), prt 0 stm])
+    CMM.Abs.SIf exp stm1 stm2 -> prPrec i 0 (concatD [doc (showString "if"), doc (showString "("), prt 0 exp, doc (showString ")"), prt 0 stm1, doc (showString "else"), prt 0 stm2])
+    CMM.Abs.SBlock stms -> prPrec i 0 (concatD [doc (showString "{"), prt 0 stms, doc (showString "}")])
+  prtList _ [] = concatD []
+  prtList _ (x:xs) = concatD [prt 0 x, prt 0 xs]
+
+instance Print [CMM.Abs.Stm] where
+  prt = prtList
+
+instance Print CMM.Abs.Exp where
+  prt i e = case e of
+    CMM.Abs.EInt n -> prPrec i 7 (concatD [prt 0 n])
+    CMM.Abs.EDouble d -> prPrec i 7 (concatD [prt 0 d])
+    CMM.Abs.EString str -> prPrec i 7 (concatD [prt 0 str])
+    CMM.Abs.ETrue -> prPrec i 7 (concatD [doc (showString "true")])
+    CMM.Abs.EFalse -> prPrec i 7 (concatD [doc (showString "false")])
+    CMM.Abs.EId id -> prPrec i 7 (concatD [prt 0 id])
+    CMM.Abs.ECall id exps -> prPrec i 7 (concatD [prt 0 id, doc (showString "("), prt 0 exps, doc (showString ")")])
+    CMM.Abs.EInc id -> prPrec i 7 (concatD [prt 0 id, doc (showString "++")])
+    CMM.Abs.EDec id -> prPrec i 7 (concatD [prt 0 id, doc (showString "--")])
+    CMM.Abs.EInc2 id -> prPrec i 7 (concatD [doc (showString "++"), prt 0 id])
+    CMM.Abs.EDec2 id -> prPrec i 7 (concatD [doc (showString "--"), prt 0 id])
+    CMM.Abs.EMul exp1 exp2 -> prPrec i 6 (concatD [prt 6 exp1, doc (showString "*"), prt 7 exp2])
+    CMM.Abs.EDiv exp1 exp2 -> prPrec i 6 (concatD [prt 6 exp1, doc (showString "/"), prt 7 exp2])
+    CMM.Abs.EAdd exp1 exp2 -> prPrec i 5 (concatD [prt 5 exp1, doc (showString "+"), prt 6 exp2])
+    CMM.Abs.ESub exp1 exp2 -> prPrec i 5 (concatD [prt 5 exp1, doc (showString "-"), prt 6 exp2])
+    CMM.Abs.ELess exp1 exp2 -> prPrec i 4 (concatD [prt 5 exp1, doc (showString "<"), prt 5 exp2])
+    CMM.Abs.EGre exp1 exp2 -> prPrec i 4 (concatD [prt 5 exp1, doc (showString ">"), prt 5 exp2])
+    CMM.Abs.ELeq exp1 exp2 -> prPrec i 4 (concatD [prt 5 exp1, doc (showString "<="), prt 5 exp2])
+    CMM.Abs.EGeq exp1 exp2 -> prPrec i 4 (concatD [prt 5 exp1, doc (showString ">="), prt 5 exp2])
+    CMM.Abs.EEqua exp1 exp2 -> prPrec i 4 (concatD [prt 5 exp1, doc (showString "=="), prt 5 exp2])
+    CMM.Abs.EIneq exp1 exp2 -> prPrec i 4 (concatD [prt 5 exp1, doc (showString "!="), prt 4 exp2])
+    CMM.Abs.EConj exp1 exp2 -> prPrec i 3 (concatD [prt 3 exp1, doc (showString "&&"), prt 4 exp2])
+    CMM.Abs.EDisj exp1 exp2 -> prPrec i 2 (concatD [prt 2 exp1, doc (showString "||"), prt 3 exp2])
+    CMM.Abs.EAss id exp -> prPrec i 1 (concatD [prt 0 id, doc (showString "="), prt 1 exp])
+    CMM.Abs.ETyped exp type_ -> prPrec i 7 (concatD [doc (showString "("), prt 0 exp, doc (showString ":"), prt 0 type_, doc (showString ")")])
+  prtList _ [] = concatD []
+  prtList _ [x] = concatD [prt 0 x]
+  prtList _ (x:xs) = concatD [prt 0 x, doc (showString ","), prt 0 xs]
+
+instance Print [CMM.Abs.Exp] where
   prt = prtList
 

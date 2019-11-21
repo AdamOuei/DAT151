@@ -9,10 +9,64 @@ type Result = Err String
 failure :: Show a => a -> Result
 failure x = Bad $ "Undefined case: " ++ show x
 
+transId :: Id -> Result
+transId x = case x of
+  Id string -> failure x
 transProgram :: Program -> Result
 transProgram x = case x of
-  PDefs defs -> failure x
-transDef :: Def -> Result
-transDef x = case x of
-  DFun -> failure x
+  Prg funcs -> failure x
+transFunc :: Func -> Result
+transFunc x = case x of
+  FDef type_ id argument body -> failure x
+transArgument :: Argument -> Result
+transArgument x = case x of
+  FArgument argss -> failure x
+transArgs :: Args -> Result
+transArgs x = case x of
+  FArgs type_ id -> failure x
+transBody :: Body -> Result
+transBody x = case x of
+  FBody stms -> failure x
+transType :: Type -> Result
+transType x = case x of
+  TDouble -> failure x
+  TBool -> failure x
+  TInt -> failure x
+  TVoid -> failure x
+transStm :: Stm -> Result
+transStm x = case x of
+  SExp exp -> failure x
+  SDecls type_ ids -> failure x
+  SInit type_ id exp -> failure x
+  SRet exp -> failure x
+  SWhile exp stm -> failure x
+  SIf exp stm1 stm2 -> failure x
+  SBlock stms -> failure x
+transExp :: Exp -> Result
+transExp x = case x of
+  EInt integer -> failure x
+  EDouble double -> failure x
+  EString string -> failure x
+  ETrue -> failure x
+  EFalse -> failure x
+  EId id -> failure x
+  ECall id exps -> failure x
+  EInc id -> failure x
+  EDec id -> failure x
+  EInc2 id -> failure x
+  EDec2 id -> failure x
+  EMul exp1 exp2 -> failure x
+  EDiv exp1 exp2 -> failure x
+  EAdd exp1 exp2 -> failure x
+  ESub exp1 exp2 -> failure x
+  ELess exp1 exp2 -> failure x
+  EGre exp1 exp2 -> failure x
+  ELeq exp1 exp2 -> failure x
+  EGeq exp1 exp2 -> failure x
+  EEqua exp1 exp2 -> failure x
+  EIneq exp1 exp2 -> failure x
+  EConj exp1 exp2 -> failure x
+  EDisj exp1 exp2 -> failure x
+  EAss id exp -> failure x
+  ETyped exp type_ -> failure x
 
