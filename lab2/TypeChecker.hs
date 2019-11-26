@@ -104,17 +104,16 @@ isBad Bad _ = True
 isBad _ = False
 
 inferBin :: Env -> Exp -> Exp -> Err Type
-inferBin env exp1 exp2 = 
-                        case inferExp env exp1 of
-                        Ok Integer -> case inferExp env exp2 of
-                            Ok Integer -> Ok Integer
-                            Ok Double -> Ok Double
+inferBin env exp1 exp2 = case inferExp env exp1 of
+                            Ok Integer -> case inferExp env exp2 of
+                                Ok Integer -> Ok Integer
+                                Ok Double -> Ok Double
+                                _ -> Bad "Bad type"
+                            Ok Double -> case inferExp env exp2 of
+                                Ok Bool -> Bad "Bad type"
+                                Bad x -> Bad x
+                                _ -> Ok Double
                             _ -> Bad "Bad type"
-                        Ok Double -> case inferExp env exp2 of
-                            Ok Bool -> Bad "Bad type"
-                            Bad x -> Bad x
-                            _ -> Ok Double
-                        _ -> Bad "Bad type"
 
 
 -- do
@@ -140,23 +139,32 @@ checkExp env typ exp = do
                "expected " ++ printTree typ ++
                "but found " ++ printTree typ2
 
-checkStms :: Env -> Stms -> Err ()
-checkStms env stms = case stms of 
+checkStms :: Env -> Type -> Stms -> Err Env
+checkStms env typ stms = case stms of 
                         SExp exp -> case inferExp env exp of
-                                        Ok _ -> return ()
+                                        Ok _ -> return Ok env
                                         _ -> Bad "Statement with faulty types"
+                        -- Check line below, map not correct
                         SDecls typ ids -> map updateVar env ids typ
                         SInit typ id exp -> case checkExp env typ exp of
                                             Ok _ -> updateVar env id typ
                                             Bad s -> Bad s
                         SRet exp -> 
-                        SWhile exp stm -> 
-                        SIf exp stm stm -> 
-                        SBlock stmxs -> 
+                        SWhile exp stm -> case checkExp env Bool exp of
+                                            Ok _ -> checkStms env stm
+                                            Bad s -> Bad s
+                        SIf exp stm1 stm2 -> case checkExp env Bool exp of
+                                            Ok _ -> case checkStms env stm1 of
+                                                        Ok _ -> checkStms env stm2
+                                                        Bad s -> Bad s
+                                            Bad s -> Bad s
+                        SBlock stmxs -> map (checkStms env) stmxs
 
 checkDef :: Env -> Def -> Err ()
+checkDef env def = 
 
 checkProg :: Program -> Err ()
+checkProg prog = map checkDef
 
 lookupVar :: Env -> Id -> Err Type
 lookupVar (_, []) id = Bad "Variable does not exist"
