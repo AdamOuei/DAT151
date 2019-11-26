@@ -36,8 +36,7 @@ $l ($l | $d | \_)*
 
 $l $i*
     { tok (\p s -> PT p (eitherResIdent (TV . share) s)) }
-\" ([$u # [\" \\ \n]] | (\\ (\" | \\ | \' | n | t | r | f)))* \"
-    { tok (\p s -> PT p (TL $ share $ unescapeInitTail s)) }
+
 
 $d+
     { tok (\p s -> PT p (TI $ share s))    }

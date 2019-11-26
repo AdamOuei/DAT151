@@ -65,7 +65,6 @@ import CMM.ErrM
   '}' { PT _ (TS _ 31) }
   L_integ  { PT _ (TI $$) }
   L_doubl  { PT _ (TD $$) }
-  L_quoted { PT _ (TL $$) }
   L_Id { PT _ (T_Id $$) }
 
 %%
@@ -75,9 +74,6 @@ Integer  : L_integ  { (read ( $1)) :: Integer }
 
 Double  :: { Double }
 Double   : L_doubl  { (read ( $1)) :: Double }
-
-String  :: { String }
-String   : L_quoted {  $1 }
 
 Id :: { Id}
 Id  : L_Id { Id ($1)}
@@ -118,7 +114,6 @@ ListStm : {- empty -} { [] } | ListStm Stm { flip (:) $1 $2 }
 Exp7 :: { Exp }
 Exp7 : Integer { CMM.Abs.EInt $1 }
      | Double { CMM.Abs.EDouble $1 }
-     | String { CMM.Abs.EString $1 }
      | 'true' { CMM.Abs.ETrue }
      | 'false' { CMM.Abs.EFalse }
      | Id { CMM.Abs.EId $1 }
@@ -142,7 +137,7 @@ Exp4 : Exp5 '<' Exp5 { CMM.Abs.ELess $1 $3 }
      | Exp5 '<=' Exp5 { CMM.Abs.ELeq $1 $3 }
      | Exp5 '>=' Exp5 { CMM.Abs.EGeq $1 $3 }
      | Exp5 '==' Exp5 { CMM.Abs.EEqua $1 $3 }
-     | Exp5 '!=' Exp4 { CMM.Abs.EIneq $1 $3 }
+     | Exp5 '!=' Exp5 { CMM.Abs.EIneq $1 $3 }
      | Exp5 { $1 }
 Exp3 :: { Exp }
 Exp3 : Exp3 '&&' Exp4 { CMM.Abs.EConj $1 $3 } | Exp4 { $1 }

@@ -37,7 +37,6 @@ data Stm
 data Exp
     = EInt Integer
     | EDouble Double
-    | EString String
     | ETrue
     | EFalse
     | EId Id

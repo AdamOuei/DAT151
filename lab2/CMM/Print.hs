@@ -153,7 +153,6 @@ instance Print CMM.Abs.Exp where
   prt i e = case e of
     CMM.Abs.EInt n -> prPrec i 7 (concatD [prt 0 n])
     CMM.Abs.EDouble d -> prPrec i 7 (concatD [prt 0 d])
-    CMM.Abs.EString str -> prPrec i 7 (concatD [prt 0 str])
     CMM.Abs.ETrue -> prPrec i 7 (concatD [doc (showString "true")])
     CMM.Abs.EFalse -> prPrec i 7 (concatD [doc (showString "false")])
     CMM.Abs.EId id -> prPrec i 7 (concatD [prt 0 id])
@@ -171,7 +170,7 @@ instance Print CMM.Abs.Exp where
     CMM.Abs.ELeq exp1 exp2 -> prPrec i 4 (concatD [prt 5 exp1, doc (showString "<="), prt 5 exp2])
     CMM.Abs.EGeq exp1 exp2 -> prPrec i 4 (concatD [prt 5 exp1, doc (showString ">="), prt 5 exp2])
     CMM.Abs.EEqua exp1 exp2 -> prPrec i 4 (concatD [prt 5 exp1, doc (showString "=="), prt 5 exp2])
-    CMM.Abs.EIneq exp1 exp2 -> prPrec i 4 (concatD [prt 5 exp1, doc (showString "!="), prt 4 exp2])
+    CMM.Abs.EIneq exp1 exp2 -> prPrec i 4 (concatD [prt 5 exp1, doc (showString "!="), prt 5 exp2])
     CMM.Abs.EConj exp1 exp2 -> prPrec i 3 (concatD [prt 3 exp1, doc (showString "&&"), prt 4 exp2])
     CMM.Abs.EDisj exp1 exp2 -> prPrec i 2 (concatD [prt 2 exp1, doc (showString "||"), prt 3 exp2])
     CMM.Abs.EAss id exp -> prPrec i 1 (concatD [prt 0 id, doc (showString "="), prt 1 exp])

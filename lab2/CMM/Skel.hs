@@ -46,7 +46,6 @@ transExp :: Exp -> Result
 transExp x = case x of
   EInt integer -> failure x
   EDouble double -> failure x
-  EString string -> failure x
   ETrue -> failure x
   EFalse -> failure x
   EId id -> failure x
