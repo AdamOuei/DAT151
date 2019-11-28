@@ -25,12 +25,12 @@ inferExp env exp = case exp of
                     ETrue -> Ok TBool
                     EFalse -> Ok TBool
                     EId id -> lookupVar env id
-                    ECall id argExps -> 
+                    ECall id argExps ->
                                     case lookupFun env id of
                                         Bad s -> Bad s
                                         Ok (argsTypes, typ) -> do
-                                                            let argsCheck = zipWith (\x y -> checkExp env x y) argTypes argExps
-                                                            if any isBad argsCheck then Bad "Arguments not ok" else Ok typ
+                                                                mapM_ (uncurry $ checkExp env) $ zip  argsTypes argExps
+                                                                return typ
                 -- Maybe change to TBool and add void
                     EInc id -> case lookupVar env id of
                                 Ok TBool -> Bad "Not valid type"
@@ -123,27 +123,42 @@ checkExp env typ exp = do
                "expected " ++ printTree typ ++
                "but found " ++ printTree typ2
 
-checkStm :: Env -> Type -> Stm -> Err Env
-checkStm env typ stm = case stm of 
+
+
+
+checkStm :: Type -> Env -> Stm -> Err Env
+checkStm retTyp env stm = case stm of 
                         SExp exp -> case inferExp env exp of
                                         Ok _ -> Ok env
                                         _ -> Bad "Statement with faulty types"
-                        SDecls typ ids -> map (\id -> updateVar env id typ)  ids
+                        SDecls typ (id:ids) -> do
+                            if typ == TVoid then Bad "Tried to declare a variable with Void"
+                            else do
+                                newEnv <- updateVar env id typ
+                                checkStm  retTyp env $ SDecls typ ids
+
+                        SDecls typ [] -> return env
                         SInit typ id exp -> case checkExp env typ exp of
                                             Ok _ -> updateVar env id typ
                                             Bad s -> Bad s
-                        SRet exp -> case checkExp env typ exp of 
+                        SRet exp -> case checkExp env retTyp exp of 
                                         Ok _ -> Ok env
                                         _ -> Bad "Not okay return statement"
                         SWhile exp stm -> case checkExp env TBool exp of
-                                            Ok _ -> checkStm env typ stm
+                                            Ok _ -> checkStm  retTyp env stm
                                             Bad s -> Bad s
                         SIf exp stm1 stm2 -> case checkExp env TBool exp of
-                                            Ok _ -> case checkStm env typ stm1 of
-                                                        Ok _ -> checkStm env typ stm2
+                                            Ok _ -> case checkStm  retTyp env stm1 of
+                                                        Ok _ -> checkStm  retTyp env stm2
                                                         Bad s -> Bad s
                                             Bad s -> Bad s
-                        SBlock stmxs -> map (checkStm env typ) stmxs
+                        SBlock stmxs -> do
+                                    checkStms retTyp (newBlock env) stmxs
+                                    return env
+
+
+checkStms :: Type -> Env ->  [Stm] -> Err Env
+checkStms retTyp = foldM (checkStm retTyp)
 
 checkDef :: Env -> Func -> Err Env
 checkDef env (FDef typ id args body) = case updateFun env id (getTypes args, typ) of
