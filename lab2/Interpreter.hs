@@ -40,7 +40,7 @@ mulValue (VInt a) (VInt b) = VInt $ a*b
 mulValue (VDouble a) (VDouble b) = VDouble $ a*b
 
 divValue :: Val -> Val -> Val
-divValue (VInt a) (VInt b) = VInt $ a/b
+divValue (VInt a) (VInt b) = VInt $ a `div` b
 divValue (VDouble a) (VDouble b) = VDouble $ a/b
 
 greaterThanValue :: Val -> Val -> Val
@@ -52,20 +52,20 @@ lessThanValue (VInt a) (VInt b) = VBool $ a<b
 lessThanValue (VDouble a) (VDouble b) = VBool $ a<b
 
 greaterThanEqualValue :: Val -> Val -> Val
-greaterThanValue (VInt a) (VInt b) = VBool $ a >= b
-greaterThanValue (VDouble a) (VDouble b) = VBool $ a >= b
+greaterThanEqualValue (VInt a) (VInt b) = VBool $ a >= b
+greaterThanEqualValue (VDouble a) (VDouble b) = VBool $ a >= b
 
 lessThanEqualValue :: Val -> Val -> Val
-lessThanValue (VInt a) (VInt b) = VBool $ a<=b
-lessThanValue (VDouble a) (VDouble b) = VBool $ a<=b
+lessThanEqualValue (VInt a) (VInt b) = VBool $ a<=b
+lessThanEqualValue (VDouble a) (VDouble b) = VBool $ a<=b
 
 equalValue :: Val -> Val -> Val
-greaterThanValue (VInt a) (VInt b) = VBool $ a == b
-greaterThanValue (VDouble a) (VDouble b) = VBool $ a == b
+equalValue (VInt a) (VInt b) = VBool $ a == b
+equalValue (VDouble a) (VDouble b) = VBool $ a == b
 
 notEqualValue :: Val -> Val -> Val
-lessThanValue (VInt a) (VInt b) = VBool $ a/=b
-lessThanValue (VDouble a) (VDouble b) = VBool $ a/=b
+notEqualValue (VInt a) (VInt b) = VBool $ a/=b
+notEqualValue (VDouble a) (VDouble b) = VBool $ a/=b
 
 
 
