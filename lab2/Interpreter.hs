@@ -12,13 +12,31 @@ import CMM.ErrM
 
 type Env = (Sig,[Context]) -- functions and context stack
 type Sig = Map Id ([Type],Type) -- function type signature
-type Context = Map Id Type -- variables with their types
+type Context = Map Id (Maybe Val) -- variables with their types
 
 data Val = VInt Integer | VDouble Double | VBool Bool | VVoid
     deriving (Eq,Show)
 
 interpret :: Program -> IO ()
 interpret p = putStrLn "no interpreter yet"
+
+eval ::  Env -> Exp -> IO (Val, Env)
+
+execProg :: Env -> IO ()
+
+execStm :: Env -> Stm -> IO (Maybe Val, Env)
+
+lookupVar :: Env -> Id -> IO Val
+
+lookupFun :: Env -> Id -> IO Func
+
+exitBlock :: Env -> Env
+
+newBlock :: Env -> Env
+
+emptyEnv :: Env
+
+
 
 
 
