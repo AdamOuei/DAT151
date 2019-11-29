@@ -12,7 +12,9 @@ import CMM.ErrM
 
 
 typecheck :: Program -> Err ()
-typecheck p = return ()
+typecheck Prg prog = do 
+    let envs = map (checkDef emptyEnv) prog
+    if any isBad envs then Bad "Faulty Program" else return ()
 
 type Env = (Sig,[Context]) -- functions and context stack
 type Sig = Map Id ([Type],Type) -- function type signature
@@ -29,20 +31,26 @@ inferExp env exp = case exp of
                                     case lookupFun env id of
                                         Bad s -> Bad s
                                         Ok (argsTypes, typ) -> do
+                                                                let tuples = zipWith (\x y -> (x, y)) argsTypes argExps
+                                                                mapM_ (\(x,y) -> checkExp env x y) tuples
                                                                 mapM_ (uncurry $ checkExp env) $ zip  argsTypes argExps
                                                                 return typ
                 -- Maybe change to TBool and add void
                     EInc id -> case lookupVar env id of
                                 Ok TBool -> Bad "Not valid type"
+                                Ok TVoid -> Bad "Not valif type"
                                 _ -> lookupVar env id
                     EDec id ->  case lookupVar env id of
                                 Ok TBool -> Bad "Not valid type"
+                                Ok TVoid -> Bad "Not valif type"
                                 _ -> lookupVar env id
                     EInc2 id ->  case lookupVar env id of
                                 Ok TBool -> Bad "Not valid type"
+                                Ok TVoid -> Bad "Not valif type"
                                 _ -> lookupVar env id
                     EDec2 id ->  case lookupVar env id of
                                 Ok TBool -> Bad "Not valid type"
+                                Ok TVoid -> Bad "Not valif type"
                                 _ -> lookupVar env id
                     EMul exp1 exp2 -> inferBin env exp1 exp2
                     EDiv exp1 exp2 -> inferBin env exp1 exp2
@@ -65,8 +73,10 @@ inferExp env exp = case exp of
                                                     Ok TBool -> Ok TBool
                                                     _ -> Bad "Bad type"
                                         Bad _ -> Bad "Bad type"
+                                        Ok TVoid -> Bad "Bad type"
                                         _ -> case inferExp env exp2 of
                                                     Ok TBool -> Bad "Bad type"
+                                                    Ok TVoid -> Bad "Bad type"
                                                     Bad _ -> Bad "Bad type"
                                                     _ -> Ok TBool
                     EIneq exp1 exp2 -> case inferExp env exp1 of
@@ -74,19 +84,23 @@ inferExp env exp = case exp of
                                                     Ok TBool -> Ok TBool
                                                     _ -> Bad "Bad type"
                                         Bad _ -> Bad "Bad type"
+                                        Ok TVoid -> Bad "Bad type"
                                         _ -> case inferExp env exp2 of
                                                     Ok TBool -> Bad "Bad type"
+                                                    Ok TVoid -> Bad "Bad type"
                                                     Bad _ -> Bad "Bad type"
                                                     _ -> Ok TBool
                     EConj exp1 exp2 -> case inferExp env exp1 of
                                         Ok TBool -> case inferExp env exp2 of
                                                     Ok TBool -> Ok TBool
                                                     _ -> Bad "Wrong type"
+                                        Ok TVoid -> Bad "Bad type"
                                         Bad _ -> Bad "Not valid type"
                     EDisj exp1 exp2 -> case inferExp env exp1 of
                                         Ok TBool -> case inferExp env exp2 of
                                                     Ok TBool -> Ok TBool
                                                     _ -> Bad "Wrong type"
+                                        Ok TVoid -> Bad "Bad type"
                                         Bad _ -> Bad "Not valid type"
                     EAss id exp -> case lookupVar env id of
                                     Bad s -> Bad s
@@ -108,9 +122,9 @@ inferBin env exp1 exp2 = case inferExp env exp1 of
                                 Ok TDouble -> Ok TDouble
                                 _ -> Bad "Bad type"
                             Ok TDouble -> case inferExp env exp2 of
-                                Ok TBool -> Bad "Bad type"
-                                Bad x -> Bad x
-                                _ -> Ok TDouble
+                                Ok TInt -> Ok TDouble
+                                Ok TDouble -> Ok TDouble
+                                _ -> Bad "Bad type"
                             _ -> Bad "Bad type"
 
 checkExp :: Env -> Type -> Exp -> Err ()
@@ -170,11 +184,6 @@ checkDef env (FDef typ id args body) = case updateFun env id (getTypes args, typ
 getTypes :: Argument -> [Type]
 getTypes (FArgument []) = []
 getTypes (FArgument FArgs typ id : xs) = typ:getTypes (FArgument xs)
-
-checkProg :: Program -> Err ()
-checkProg (Prg prog) = do 
-                    let envs = map (checkDef emptyEnv) prog
-                    if any isBad envs then Bad "Faulty Program" else return ()
 
 lookupVar :: Env -> Id -> Err Type
 lookupVar (_, []) id = Bad "Variable does not exist"
