@@ -12,14 +12,16 @@ import CMM.ErrM
 
 
 type Env = (Sig,[Context]) -- functions and context stack
-type Sig = Map Id ([Type],Type) -- function type signature
+type Sig = Map Id Func-- function type signature
 type Context = Map Id (Maybe Val) -- variables with their types
 
 data Val = VInt Integer | VDouble Double | VBool Bool | VVoid
     deriving (Eq,Show)
 
 interpret :: Program -> IO ()
-interpret p = putStrLn "no interpreter yet"
+interpret (Prg funcs) = do
+    env <- foldM updateFun emptyEnv funcs
+    execProg env 
 
 evalExp ::  Env -> Exp -> IO (Val, Env)
 evalExp env@(sig,top:context) exp =  case exp of
@@ -30,6 +32,7 @@ evalExp env@(sig,top:context) exp =  case exp of
                         EId id -> do 
                             val <- lookupVar env id 
                             return (val,env)
+                        -- This must be done!
                         ECall id argExps -> return (VBool True,env)
                                         
                         -- Maybe change to TBool and add void
@@ -118,7 +121,21 @@ evalExp env@(sig,top:context) exp =  case exp of
                                         env2 <- updateVar env1 id val1
                                         return (val1,env2)
 
---execProg :: Env -> IO ()
+execProg :: Env -> IO ()
+execProg env = do
+    FDef _ _ _ (FBody stms) <- lookupFun env (Id "main")
+    execStms env stms
+    return ()
+
+
+execStms :: Env -> [Stm] -> IO (Maybe Val, Env)
+execStms env [] = return (Nothing, env)
+execStms env (stm:stms) = do
+                    (newVal,newEnv) <- execStm env stm
+                    if isJust newVal
+                        then return (newVal,newEnv)
+                        else execStms newEnv stms
+
 
 execStm :: Env -> Stm -> IO (Maybe Val, Env)
 execStm env@(sig,top:context) stm = case stm of 
@@ -152,12 +169,9 @@ execStm env@(sig,top:context) stm = case stm of
                     (newVal,env2) <- execStm (newBlock env1) newStm
                     return (newVal, exitBlock env2)
         SBlock [] -> return (Nothing, env)
-        SBlock (stm:stms) -> do
-                (newVal,newEnv) <- execStm env stm
-                if isJust newVal
-                    then 
-                        return (newVal,newEnv)
-                    else execStm newEnv $ head stms
+        SBlock stms -> do
+                (newVal, newEnv) <- execStms (newBlock env) stms
+                return (newVal, exitBlock newEnv)
 
                         
 
@@ -177,7 +191,7 @@ lookupVar (sig,first:context) id = case Map.lookup id first of
                                     Just Nothing -> fail "Variable not found"
                                     Nothing -> fail "Variable not found"
 
-lookupFun :: Env -> Id -> IO ([Type],Type)
+lookupFun :: Env -> Id -> IO Func
 lookupFun (sig, _) id = case Map.lookup id sig of
                             Nothing -> fail "Function not found"
                             Just fun -> return fun
@@ -194,6 +208,13 @@ updateVar (sig, top:stack) id val =
                     where newTop = Map.insert id (Just val) top
 updateVar _ id _ = fail "Can't find variable for id"                        
                 
+updateFun :: Env -> Func -> IO Env
+updateFun (sig,context) func@(FDef _ id _ _ ) =
+    if Map.member id sig
+    then fail "Function alreadty exists"
+    else return (Map.insert id func sig , context)
+
+
 exitBlock :: Env -> Env
 exitBlock (sig, firstBlock:context)= (sig, context) 
 
