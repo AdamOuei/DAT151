@@ -29,91 +29,132 @@ evalExp env@(sig,top:context) exp =  case exp of
                         EId id -> do 
                             val <- lookupVar env id 
                             return (val,env)
-                        ECall id argExps ->
-                                        case lookupFun env id of
-                                            Bad s -> Bad s
-                                            Ok (argsTypes, typ) -> do
-                                                                    mapM_ (uncurry $ checkExp env) $ zip  argsTypes argExps
-                                                                    return typ
+                        ECall id argExps -> return (VBool True,env)
+                                        
                         -- Maybe change to TBool and add void
-                        EInc id -> case lookupVar env id of
-                                    Ok TBool -> Bad "Not valid type"
-                                    _ -> lookupVar env id
-                        EDec id ->  case lookupVar env id of
-                                    Ok TBool -> Bad "Not valid type"
-                                    _ -> lookupVar env id
-                        EInc2 id ->  case lookupVar env id of
-                                    Ok TBool -> Bad "Not valid type"
-                                    _ -> lookupVar env id
-                        EDec2 id ->  case lookupVar env id of
-                                    Ok TBool -> Bad "Not valid type"
-                                    _ -> lookupVar env id
-                        EMul exp1 exp2 -> inferBin env exp1 exp2
-                        EDiv exp1 exp2 -> inferBin env exp1 exp2
-                        EAdd exp1 exp2 -> inferBin env exp1 exp2
-                        ESub exp1 exp2 -> inferBin env exp1 exp2
-                        ELess exp1 exp2 -> case inferBin env exp1 exp2 of
-                                            Ok _ -> Ok TBool
-                                            _ -> Bad "Bad type"                
-                        EGre exp1 exp2 -> case inferBin env exp1 exp2 of
-                                            Ok _ -> Ok TBool
-                                            _ -> Bad "Bad type"
-                        ELeq exp1 exp2 -> case inferBin env exp1 exp2 of
-                                            Ok _ -> Ok TBool
-                                            _ -> Bad "Bad type"
-                        EGeq exp1 exp2 -> case inferBin env exp1 exp2 of
-                                            Ok _ -> Ok TBool
-                                            _ -> Bad "Bad type"
-                        EEqua exp1 exp2 -> case inferExp env exp1 of
-                                            Ok TBool -> case inferExp env exp2 of
-                                                        Ok TBool -> Ok TBool
-                                                        _ -> Bad "Bad type"
-                                            Bad _ -> Bad "Bad type"
-                                            _ -> case inferExp env exp2 of
-                                                        Ok TBool -> Bad "Bad type"
-                                                        Bad _ -> Bad "Bad type"
-                                                        _ -> Ok TBool
-                        EIneq exp1 exp2 -> case inferExp env exp1 of
-                                            Ok TBool -> case inferExp env exp2 of
-                                                        Ok TBool -> Ok TBool
-                                                        _ -> Bad "Bad type"
-                                            Bad _ -> Bad "Bad type"
-                                            _ -> case inferExp env exp2 of
-                                                        Ok TBool -> Bad "Bad type"
-                                                        Bad _ -> Bad "Bad type"
-                                                        _ -> Ok TBool
-                        EConj exp1 exp2 -> case inferExp env exp1 of
-                                            Ok TBool -> case inferExp env exp2 of
-                                                        Ok TBool -> Ok TBool
-                                                        _ -> Bad "Wrong type"
-                                            Bad _ -> Bad "Not valid type"
-                        EDisj exp1 exp2 -> case inferExp env exp1 of
-                                            Ok TBool -> case inferExp env exp2 of
-                                                        Ok TBool -> Ok TBool
-                                                        _ -> Bad "Wrong type"
-                                            Bad _ -> Bad "Not valid type"
-                        EAss id exp -> case lookupVar env id of
-                                        Bad s -> Bad s
-                                        Ok typ -> case checkExp env typ exp of
-                                                    Bad s -> Bad s
-                                                    Ok _ -> Ok typ 
-                        ETyped exp typ -> case checkExp env typ exp of
-                                            Ok _ -> Ok typ
-                                            Bad s -> Bad s
+                        EInc id -> do
+                                    val <- lookupVar env id
+                                    let newVal = addValue val (VInt 1)
+                                    newEnv <- updateVar env id newVal
+                                    return (newVal, newEnv)
+                        EDec id ->  do
+                                    val <- lookupVar env id
+                                    let newVal = subValue val (VInt 1)
+                                    newEnv <- updateVar env id newVal
+                                    return (newVal, newEnv)
+                        EInc2 id ->  do
+                                        val <- lookupVar env id
+                                        let newVal = addValue val (VInt 1)
+                                        newEnv <- updateVar env id newVal
+                                        return (val,newEnv)
+                        EDec2 id ->  do
+                                        val <- lookupVar env id
+                                        let newVal = subValue val (VInt 1)
+                                        newEnv <- updateVar env id newVal
+                                        return (val,newEnv)
+                        EMul exp1 exp2 -> do 
+                                            (val1,env1) <- evalExp env exp1
+                                            (val2,env2) <- evalExp env exp2
+                                            let newVal = mulValue val1 val2
+                                            return (newVal, env2)
+                        EDiv exp1 exp2 ->do 
+                                            (val1,env1) <- evalExp env exp1
+                                            (val2,env2) <- evalExp env exp2
+                                            let newVal = divValue val1 val2
+                                            return (newVal, env2)
+                        EAdd exp1 exp2 ->do 
+                                            (val1,env1) <- evalExp env exp1
+                                            (val2,env2) <- evalExp env exp2
+                                            let newVal = subValue val1 val2
+                                            return (newVal, env2)
+                        ESub exp1 exp2 ->do 
+                                            (val1,env1) <- evalExp env exp1
+                                            (val2,env2) <- evalExp env exp2
+                                            let newVal = subValue val1 val2
+                                            return (newVal, env2)
+                        ELess exp1 exp2 -> do 
+                                            (val1,env1) <- evalExp env exp1
+                                            (val2,env2) <- evalExp env exp2
+                                            let newVal = lessThanValue val1 val2
+                                            return (newVal, env2)
+                        EGre exp1 exp2 -> do 
+                                            (val1,env1) <- evalExp env exp1
+                                            (val2,env2) <- evalExp env exp2
+                                            let newVal = greaterThanValue val1 val2
+                                            return (newVal, env2)
+                        ELeq exp1 exp2 -> do 
+                                            (val1,env1) <- evalExp env exp1
+                                            (val2,env2) <- evalExp env exp2
+                                            let newVal = lessThanEqualValue val1 val2
+                                            return (newVal, env2)
+                        EGeq exp1 exp2 -> do 
+                                            (val1,env1) <- evalExp env exp1
+                                            (val2,env2) <- evalExp env exp2
+                                            let newVal = greaterThanEqualValue val1 val2
+                                            return (newVal, env2)
+                        EEqua exp1 exp2 -> do 
+                                            (val1,env1) <- evalExp env exp1
+                                            (val2,env2) <- evalExp env exp2
+                                            let newVal = equalValue val1 val2
+                                            return (newVal, env2)
+                        EIneq exp1 exp2 -> do 
+                                            (val1,env1) <- evalExp env exp1
+                                            (val2,env2) <- evalExp env exp2
+                                            let newVal = notEqualValue val1 val2
+                                            return (newVal, env2)
+                        EConj exp1 exp2 -> do
+                                            (val1, env1) <- evalExp env exp1
+                                            case val1 of
+                                                VBool True -> return (VBool True, env1)
+                                                VBool False -> evalExp env exp2
+                        EDisj exp1 exp2 -> do
+                                            (val1,env1) <- evalExp env exp1
+                                            case val1 of 
+                                                VBool True -> evalExp env1 exp2
+                                                VBool False -> return (VBool False,env1)
+                        EAss id exp -> do
+                                        (val1,env1) <- evalExp env exp 
+                                        env2 <- updateVar env1 id val1
+                                        return (val1,env2)
 
-execProg :: Env -> IO ()
+--execProg :: Env -> IO ()
 
 execStm :: Env -> Stm -> IO (Maybe Val, Env)
 execStm env@(sig,top:context) stm = case stm of 
         SExp exp -> do
-        SDecls typ (id:ids) -> 
-        SDecls typ [] -> 
-        SInit typ id exp -> 
-        SRet exp -> 
-        SWhile exp stm -> 
-        SIf exp stm1 stm2 -> 
-        SBlock stmxs -> 
-                
+                (val, env2) <- evalExp env exp
+                return (Nothing, env2)
+        SDecls typ ids -> return (Nothing, foldl declareVar env ids)
+        
+        SInit typ id exp -> do
+            (val1, env1) <- evalExp env exp
+            return (Nothing, initVar env1 id val1)
+        SRet exp -> do
+            (val1,env1) <- evalExp env exp
+            return (Just val1, env1)
+        SWhile exp stm -> do
+                (val1, env1) <- evalExp env exp
+                if val1 == VBool True
+                then return execStm env1 stm
+                else 
+                    return (Nothing,env1)     
+        SIf exp stm1 stm2 -> do
+                    (val1,env1) <- evalExp env exp
+                    if val1 == VBool True then
+                        return execStm env1 stm1
+                        else
+                            return execStm env1 stm2
+
+        SBlock stmxs -> foldl checkStm env stmx
+
+
+declareVar :: Env -> Id -> Env
+declareVar (sig,top:context) id = (sig, newTop:context)
+                where newTop = Map.insert id Nothing top
+
+initVar :: Env -> Id -> Val -> Env
+initVar (sig, top:context) id val = (sig, newTop:context) 
+                where newTop = Map.insert id (Just val) top
 
 lookupVar :: Env -> Id -> IO Val
 lookupVar (_, []) _ = fail "No variable found"
@@ -126,6 +167,15 @@ lookupFun :: Env -> Id -> IO Func
 lookupFun (sig, _) id = case Map.lookup id sig of
                             Nothing -> fail "Function not found"
                             Just fun -> return fun
+
+-- Fix this to work withn interpreters
+updateVar :: Env -> Id -> Val -> IO Env
+updateVar (sig, top:stack) id val = 
+            case lookupVar (sig, top:stack) id of
+                Bad _ -> do
+                    let newStack = Map.insert id typ top 
+                    Ok (sig, newStack:stack)
+                Ok _ -> Bad "Already in environment"
 
 exitBlock :: Env -> Env
 exitBlock (sig, firstBlock:context)= (sig, context) 
