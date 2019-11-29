@@ -4,6 +4,7 @@ import Control.Monad
 
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Maybe
 
 import CMM.Abs
 import CMM.Print
@@ -132,20 +133,33 @@ execStm env@(sig,top:context) stm = case stm of
         SRet exp -> do
             (val1,env1) <- evalExp env exp
             return (Just val1, env1)
-        SWhile exp stm -> do
+        SWhile exp stm1 -> do
                 (val1, env1) <- evalExp env exp
                 if val1 == VBool True
-                then return execStm env1 stm
-                else 
-                    return (Nothing,env1)     
+                    then do 
+                        (val2, env2) <- execStm (newBlock env1) stm1
+                        let newEnv = exitBlock env2
+                        if isJust val2
+                            then return (val2,newEnv)
+                            else execStm newEnv stm
+                    else 
+                        return (Nothing,env1)     
         SIf exp stm1 stm2 -> do
                     (val1,env1) <- evalExp env exp
-                    if val1 == VBool True then
-                        return execStm env1 stm1
-                        else
-                            return execStm env1 stm2
+                    let newStm =  if val1 == VBool True 
+                        then stm1
+                        else stm2
+                    (newVal,env2) <- execStm (newBlock env1) newStm
+                    return (newVal, exitBlock env2)
+        SBlock [] -> return (Nothing, env)
+        SBlock (stm:stms) -> do
+                (newVal,newEnv) <- execStm env stm
+                if isJust newVal
+                    then 
+                        return (newVal,newEnv)
+                    else execStm newEnv $ head stms
 
-        SBlock stmxs -> foldl checkStm env stmx
+                        
 
 
 declareVar :: Env -> Id -> Env
@@ -163,7 +177,7 @@ lookupVar (sig,first:context) id = case Map.lookup id first of
                                     Just Nothing -> fail "Variable not found"
                                     Nothing -> fail "Variable not found"
 
-lookupFun :: Env -> Id -> IO Func
+lookupFun :: Env -> Id -> IO ([Type],Type)
 lookupFun (sig, _) id = case Map.lookup id sig of
                             Nothing -> fail "Function not found"
                             Just fun -> return fun
@@ -171,12 +185,15 @@ lookupFun (sig, _) id = case Map.lookup id sig of
 -- Fix this to work withn interpreters
 updateVar :: Env -> Id -> Val -> IO Env
 updateVar (sig, top:stack) id val = 
-            case lookupVar (sig, top:stack) id of
-                Bad _ -> do
-                    let newStack = Map.insert id typ top 
-                    Ok (sig, newStack:stack)
-                Ok _ -> Bad "Already in environment"
-
+                    if Map.member id top 
+                    then return (sig, newTop:stack)
+                    else do
+                        (newSig, newContext) <- updateVar (sig, stack) id val
+                        return (newSig,top:newContext)
+                    
+                    where newTop = Map.insert id (Just val) top
+updateVar _ id _ = fail "Can't find variable for id"                        
+                
 exitBlock :: Env -> Env
 exitBlock (sig, firstBlock:context)= (sig, context) 
 
