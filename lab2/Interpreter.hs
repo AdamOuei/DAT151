@@ -122,9 +122,9 @@ evalExp env@(sig,top:context) exp =  case exp of
                                         return (val1,env2)
 
 
-evalCall :: Env -> Id -> Arguments -> IO (Val, Env)
-evalCall env id args = do
-                         (FDef typ id args body) <- lookupFun env id
+--evalCall :: Env -> Id -> Arguments -> IO (Val, Env)
+--evalCall env id args = do
+  --                       (FDef typ id args body) <- lookupFun env id
 
 
 execProg :: Env -> IO ()
