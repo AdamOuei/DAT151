@@ -12,13 +12,22 @@ import CMM.ErrM
 
 
 typecheck :: Program -> Err ()
-typecheck Prg prog = do 
-    let envs = map (checkDef emptyEnv) prog
-    if any isBad envs then Bad "Faulty Program" else return ()
+typecheck (Prg prog) = do 
+    let funcs = map getTypes prog
+    env <- foldM (\env (id,typ) -> updateFun env id typ ) emptyEnv funcs
+    isMain env
+    
+
 
 type Env = (Sig,[Context]) -- functions and context stack
 type Sig = Map Id ([Type],Type) -- function type signature
 type Context = Map Id Type -- variables with their types
+
+isMain :: Env -> Err ()
+isMain env = do 
+    hasMain <- lookupFun env (Id "main")
+    return hasMain
+
 
 inferExp :: Env -> Exp -> Err Type
 inferExp env exp = case exp of
@@ -31,8 +40,6 @@ inferExp env exp = case exp of
                                     case lookupFun env id of
                                         Bad s -> Bad s
                                         Ok (argsTypes, typ) -> do
-                                                                let tuples = zipWith (\x y -> (x, y)) argsTypes argExps
-                                                                mapM_ (\(x,y) -> checkExp env x y) tuples
                                                                 mapM_ (uncurry $ checkExp env) $ zip  argsTypes argExps
                                                                 return typ
                 -- Maybe change to TBool and add void
@@ -175,15 +182,16 @@ checkStms :: Type -> Env ->  [Stm] -> Err Env
 checkStms retTyp = foldM (checkStm retTyp)
 
 checkDef :: Env -> Func -> Err Env
-checkDef env (FDef typ id args body) = case updateFun env id (getTypes args, typ) of
-                                    Ok env2 -> case map (checkStm env2) typ body of
-                                                    Ok env3 -> Ok env3
-                                                    Bad _ -> Bad "Could not parse body"
-                                    Bad _ -> Bad "Wrong Function head"
+checkDef env func@(FDef typ _ _ (FBody stms)) = do
+                    newEnv <- uncurry (updateFun env) (getTypes func)
+                    checkStms typ newEnv stms
+-- checkDef env (FDef typ id args (FBody stms)) = do
+--                                        newEnv <-  updateFun env id (getTypes args ,typ)
+  --                                      checkStms typ newEnv stms
+                                                 
 
-getTypes :: Argument -> [Type]
-getTypes (FArgument []) = []
-getTypes (FArgument FArgs typ id : xs) = typ:getTypes (FArgument xs)
+getTypes :: Func -> (Id, ([Type],Type))
+getTypes (FDef typ id (FArgument args) body) = (id,  ( (map (\(FArgs typ _) -> typ) args ),typ))
 
 lookupVar :: Env -> Id -> Err Type
 lookupVar (_, []) id = Bad "Variable does not exist"
