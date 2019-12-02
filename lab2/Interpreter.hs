@@ -15,13 +15,17 @@ type Env = (Sig,[Context]) -- functions and context stack
 type Sig = Map Id Func-- function type signature
 type Context = Map Id (Maybe Val) -- variables with their types
 
-data Val = VInt Integer | VDouble Double | VBool Bool | VVoid
+data Val = VInt Integer | VDouble Double | VBool Bool | VVoid | Ret Val
     deriving (Eq,Show)
 
 interpret :: Program -> IO ()
 interpret (Prg funcs) = do
-    env <- foldM updateFun emptyEnv funcs
-    execProg env 
+    (sig, ctxs) <- foldM updateFun emptyEnv funcs
+    case Map.lookup (Id "main") sig of
+        Nothing -> "main missing"
+        Just func -> do
+                        execFunc env func []
+                        return ()
 
 evalExp ::  Env -> Exp -> IO (Val, Env)
 evalExp env@(sig,top:context) exp =  case exp of
@@ -33,8 +37,7 @@ evalExp env@(sig,top:context) exp =  case exp of
                             val <- lookupVar env id 
                             return (val,env)
                         -- This must be done! TODO!!!
-                        ECall id argExps -> return (VBool True,env)
-                                        
+                        ECall id argExps -> evalCall env id argExps 
                         -- Maybe change to TBool and add void
                         EInc id -> do
                                     val <- lookupVar env id
@@ -69,7 +72,7 @@ evalExp env@(sig,top:context) exp =  case exp of
                         EAdd exp1 exp2 ->do 
                                             (val1,env1) <- evalExp env exp1
                                             (val2,env2) <- evalExp env exp2
-                                            let newVal = subValue val1 val2
+                                            let newVal = addValue val1 val2
                                             return (newVal, env2)
                         ESub exp1 exp2 ->do 
                                             (val1,env1) <- evalExp env exp1
@@ -109,72 +112,96 @@ evalExp env@(sig,top:context) exp =  case exp of
                         EConj exp1 exp2 -> do
                                             (val1, env1) <- evalExp env exp1
                                             case val1 of
-                                                VBool True -> return (VBool True, env1)
-                                                VBool False -> evalExp env exp2
+                                                VBool True -> evalExp env1 exp2
+                                                VBool False -> return (val1, env1) 
                         EDisj exp1 exp2 -> do
                                             (val1,env1) <- evalExp env exp1
                                             case val1 of 
-                                                VBool True -> evalExp env1 exp2
-                                                VBool False -> return (VBool False,env1)
+                                                VBool True -> return (val1, env1) 
+                                                VBool False -> evalExp env1 exp2
                         EAss id exp -> do
-                                        (val1,env1) <- evalExp env exp 
-                                        env2 <- updateVar env1 id val1
-                                        return (val1,env2)
+                                        (val, env1) <- evalExp env exp 
+                                        env2 <- updateVar env1 id val
+                                        return (val, env2)
 
 
-evalCall :: Env -> Id -> Arguments -> IO (Val, Env)
-evalCall env id args = do
-                         (FDef typ id args body) <- lookupFun env id
+evalCall :: Env -> Id -> [Exp] -> IO (Val, Env)
+evalCall env id argExps = case id of
+    Id "printInt" -> do
+        (VInt int, newEnv) <- map (evalExp env) argExps
+        print int
+        return (VVoid, newEnv)
+    Id "printDouble" -> do
+        (VDouble double, newEnv) <- map (evalExp env) argExps
+        print double
+        return (VVoid, newEnv)
+    Id "readInt" -> do
+        input <- getLine
+        let parsedInput = read input :: Integer
+        return (VInt parsedInput, env)
+    Id "readDouble" -> do
+        input <- getLine
+        let parsedInput = read input :: Double
+        return (VDouble parsedInput, env)
+    _ -> case argExps of
+        [] -> do
+            let func = lookupFun env id
+            execFunc env id []
+        _ -> do
+            let func = lookupFun env id
+            (vals, (sig, ctx)) <- evalArgs en exps
+            (val, newEnv) <- execFunc (sig, []) func vals
+            return (val, (sig, ctx))
 
+execFunc :: Env -> Func -> [Val] -> IO (Val, Env)
+execFunc env (FDef typ id args body) vals = do
+    let params = zip args vals
+    let newEnv = map (\((Arg _ id), val) -> updateVar env id val) params
+    (retVal, newEnv') <- execStms newEnv body
+    case retVal of
+        Ret val -> return (val, exitBlock newEnv')
+        _ -> return (VVoid, exitBlock newEnv')
 
-execProg :: Env -> IO ()
-execProg env = do
-    FDef _ _ _ (FBody stms) <- lookupFun env (Id "main")
-    execStms env stms
-    return ()
-
-
-execStms :: Env -> [Stm] -> IO (Maybe Val, Env)
-execStms env [] = return (Nothing, env)
+execStms :: Env -> [Stm] -> IO (Val, Env)
+execStms env [] = return (VVoid, env)
 execStms env (stm:stms) = do
                     (newVal,newEnv) <- execStm env stm
-                    if isJust newVal
-                        then return (newVal,newEnv)
-                        else execStms newEnv stms
+                    case newVal of
+                        Return _ -> return (val, newEnv)
+                        _ -> execStms newEnv stms
 
-
-execStm :: Env -> Stm -> IO (Maybe Val, Env)
+execStm :: Env -> Stm -> IO (Val, Env)
 execStm env@(sig,top:context) stm = case stm of 
-        SExp exp -> do
-                (val, env2) <- evalExp env exp
-                return (Nothing, env2)
-        SDecls typ ids -> return (Nothing, foldl declareVar env ids)
-        
+        SExp exp -> evalExp env exp
+        SDecls typ ids -> case typ of
+            TVoid -> return (VVoid, env)
+            _ -> return (VVoid, map (\id -> initVar env id VVoid ))        
         SInit typ id exp -> do
             (val1, env1) <- evalExp env exp
-            return (Nothing, initVar env1 id val1)
+            return (val1, initVar env1 id val1)
         SRet exp -> do
             (val1,env1) <- evalExp env exp
-            return (Just val1, env1)
+            return (Return val1, env1)
         SWhile exp stm1 -> do
                 (val1, env1) <- evalExp env exp
                 if val1 == VBool True
                     then do 
                         (val2, env2) <- execStm (newBlock env1) stm1
                         let newEnv = exitBlock env2
-                        if isJust val2
-                            then return (val2,newEnv)
-                            else execStm newEnv stm
+                        case val2 of
+                            Return _ -> return (VVoid, exitBlock env1)
+                            _ -> execStm (exitBlock env2) (SWhile exp stm1)
                     else 
-                        return (Nothing,env1)     
+                        return (VVoid, exitBlock env1)     
         SIf exp stm1 stm2 -> do
                     (val1,env1) <- evalExp env exp
-                    let newStm =  if val1 == VBool True 
-                        then stm1
-                        else stm2
-                    (newVal,env2) <- execStm (newBlock env1) newStm
-                    return (newVal, exitBlock env2)
-        SBlock [] -> return (Nothing, env)
+                    case val1 of
+                        (VBool True) -> do
+                            (val2, env2) <- execStm env1 stm1
+                            return (val2, exitBlock env2)
+                        (VBool False) -> do
+                            (val2, env2) <- execStm env1 stm2
+                            return (val2, exitBlock env2)
         SBlock stms -> do
                 (newVal, newEnv) <- execStms (newBlock env) stms
                 return (newVal, exitBlock newEnv)
@@ -188,41 +215,33 @@ declareVar (sig,top:context) id = (sig, newTop:context)
 
 initVar :: Env -> Id -> Val -> Env
 initVar (sig, top:context) id val = (sig, newTop:context) 
-                where newTop = Map.insert id (Just val) top
+                where newTop = Map.insert id val top
 
 lookupVar :: Env -> Id -> IO Val
 lookupVar (_, []) _ = fail "No variable found"
 lookupVar (sig,first:context) id = case Map.lookup id first of
-                                    Just (Just val) -> return val
-                                    Just Nothing -> fail "Variable not found"
-                                    Nothing -> fail "Variable not found"
+                                    Just VVoid -> fail "Void has no value"
+                                    Just val -> return val
+                                    Nothing -> lookupVar (sig, context) id
 
-lookupFun :: Env -> Id -> IO Func
+lookupFun :: Env -> Id -> Func
 lookupFun (sig, _) id = case Map.lookup id sig of
-                            Nothing -> fail "Function not found"
-                            Just fun -> return fun
+                            Just fun -> fun
 
 -- Fix this to work withn interpreters
-updateVar :: Env -> Id -> Val -> IO Env
-updateVar (sig, top:stack) id val = 
-                    if Map.member id top 
-                    then return (sig, newTop:stack)
-                    else do
-                        (newSig, newContext) <- updateVar (sig, stack) id val
-                        return (newSig,top:newContext)
-                    
-                    where newTop = Map.insert id (Just val) top
-updateVar _ id _ = fail "Can't find variable for id"                        
+updateVar :: Env -> Id -> Val -> Env
+updateVar (sig, ctx@(top:stack)) id val = 
+    case Map.lookup id top of
+        Nothing -> do
+            let (newSig, newStack) = updateVar (sig, stack) id val
+            (newSig, top:newStack)
+        Just _ -> (sig, Map.insert id val ctx)                       
                 
-updateFun :: Env -> Func -> IO Env
-updateFun (sig,context) func@(FDef _ id _ _ ) =
-    if Map.member id sig
-    then fail "Function alreadty exists"
-    else return (Map.insert id func sig , context)
-
+updateFun :: Env -> Func -> Env
+updateFun (sig,context) func = (Map.insert id func sig, context)
 
 exitBlock :: Env -> Env
-exitBlock (sig, firstBlock:context)= (sig, context) 
+exitBlock (sig, top:context) = (sig, context) 
 
 newBlock :: Env -> Env
 newBlock (sig,context) = (sig, Map.empty:context)
@@ -230,45 +249,45 @@ newBlock (sig,context) = (sig, Map.empty:context)
 emptyEnv :: Env
 emptyEnv  = (Map.empty,[])
 
-addValue :: Val -> Val -> Val
+addValue :: Num a => a -> a -> a
 addValue (VInt a) (VInt b) = VInt $ a + b 
 addValue (VDouble a) (VDouble b) = VDouble $ a + b 
 addValue (VDouble a) (VInt b) = VDouble $ a + fromIntegral b
 
-subValue :: Val -> Val -> Val
+subValue :: Num a => a -> a -> a
 subValue (VInt a) (VInt b) = VInt $ a-b
 subValue (VDouble a) (VDouble b) = VDouble $ a-b
 subValue (VDouble a) (VInt b) = VDouble $ a - fromIntegral b
 
-mulValue :: Val -> Val -> Val
+mulValue :: Num a => a -> a -> a
 mulValue (VInt a) (VInt b) = VInt $ a*b
 mulValue (VDouble a) (VDouble b) = VDouble $ a*b
 
-divValue :: Val -> Val -> Val
+divValue :: Num a => a -> a -> a
 divValue (VInt a) (VInt b) = VInt $ a `div` b
 divValue (VDouble a) (VDouble b) = VDouble $ a/b
 
-greaterThanValue :: Val -> Val -> Val
+greaterThanValue :: (Eq a, Ord a) => a -> a -> a
 greaterThanValue (VInt a) (VInt b) = VBool $ a > b
 greaterThanValue (VDouble a) (VDouble b) = VBool $ a > b
 
-lessThanValue :: Val -> Val -> Val
+lessThanValue :: (Eq a, Ord a) => a -> a -> a
 lessThanValue (VInt a) (VInt b) = VBool $ a<b
 lessThanValue (VDouble a) (VDouble b) = VBool $ a<b
 
-greaterThanEqualValue :: Val -> Val -> Val
+greaterThanEqualValue :: (Eq a, Ord a) => a -> a -> a
 greaterThanEqualValue (VInt a) (VInt b) = VBool $ a >= b
 greaterThanEqualValue (VDouble a) (VDouble b) = VBool $ a >= b
 
-lessThanEqualValue :: Val -> Val -> Val
+lessThanEqualValue :: (Eq a, Ord a) => a -> a -> a
 lessThanEqualValue (VInt a) (VInt b) = VBool $ a<=b
 lessThanEqualValue (VDouble a) (VDouble b) = VBool $ a<=b
 
-equalValue :: Val -> Val -> Val
+equalValue :: (Eq a, Ord a) => a -> a -> a
 equalValue (VInt a) (VInt b) = VBool $ a == b
 equalValue (VDouble a) (VDouble b) = VBool $ a == b
 
-notEqualValue :: Val -> Val -> Val
+notEqualValue :: (Eq a, Ord a) => a -> a -> a
 notEqualValue (VInt a) (VInt b) = VBool $ a/=b
 notEqualValue (VDouble a) (VDouble b) = VBool $ a/=b
 
