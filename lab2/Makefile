@@ -17,6 +17,9 @@ files=lab2.hs CMM.cf Makefile TypeChecker.hs Interpreter.hs
 lab2 : $(files) CMM/Test
 	ghc --make lab2.hs -o lab2
 
+test: lab2
+	./lab2 testFiles/test.cc
+
 # Rules to build the parser:
 
 CMM/Test.hs CMM/Lex.x CMM/Par.y : CMM.cf

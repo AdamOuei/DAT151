@@ -121,6 +121,12 @@ evalExp env@(sig,top:context) exp =  case exp of
                                         env2 <- updateVar env1 id val1
                                         return (val1,env2)
 
+
+evalCall :: Env -> Id -> Arguments -> IO (Val, Env)
+evalCall env id args = do
+                         (FDef typ id args body) <- lookupFun env id
+
+
 execProg :: Env -> IO ()
 execProg env = do
     FDef _ _ _ (FBody stms) <- lookupFun env (Id "main")
@@ -222,7 +228,7 @@ newBlock :: Env -> Env
 newBlock (sig,context) = (sig, Map.empty:context)
 
 emptyEnv :: Env
-emptyEnv  = (Map.empty,[Map.empty])
+emptyEnv  = (Map.empty,[])
 
 addValue :: Val -> Val -> Val
 addValue (VInt a) (VInt b) = VInt $ a + b 
