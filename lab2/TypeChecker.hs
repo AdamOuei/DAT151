@@ -200,8 +200,8 @@ checkStms retTyp = foldM (checkStm retTyp)
 
 checkDef :: Env -> Func -> Err Env
 checkDef env func@(FDef typ id (FArgument args) (FBody stms)) = do
-                    newEnv <- foldM (\env (FArgs typ id) -> updateVar env id typ) (newBlock env) args
-                    checkStms typ newEnv stms
+                    foldM (\env (FArgs typ id) -> updateVar env id typ) (newBlock env) args
+                    --checkStms typ newEnv stms
 
                  
 -- checkDef env (FDef typ id args (FBody stms)) = do

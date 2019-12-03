@@ -18,7 +18,7 @@ lab2 : $(files) CMM/Test
 	ghc --make lab2.hs -o lab2
 
 test: lab2
-	./lab2 testFiles/test.cc
+	./lab2 testFiles/arg_mutation_ass.cc
 
 # Rules to build the parser:
 

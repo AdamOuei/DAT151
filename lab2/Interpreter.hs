@@ -15,13 +15,20 @@ type Env = (Sig,[Context]) -- functions and context stack
 type Sig = Map Id Func-- function type signature
 type Context = Map Id (Maybe Val) -- variables with their types
 
-data Val = VInt Integer | VDouble Double | VBool Bool | VVoid
+data Val = VInt Integer | VDouble Double | VBool Bool | VVoid | Ret Val
     deriving (Eq,Show)
 
 interpret :: Program -> IO ()
 interpret (Prg funcs) = do
     env <- foldM updateFun emptyEnv funcs
     execProg env 
+
+evalExps :: Env -> [Exp] -> IO ([Val],Env)
+evalExps env (exp:exps) = do
+    (val1,newEnv) <- evalExp env exp
+    (val2,newerEnv) <- evalExps newEnv exps
+    return (val1:val2, newerEnv)
+evalExps env [] = return ([],env)     
 
 evalExp ::  Env -> Exp -> IO (Val, Env)
 evalExp env@(sig,top:context) exp =  case exp of
@@ -32,9 +39,21 @@ evalExp env@(sig,top:context) exp =  case exp of
                         EId id -> do 
                             val <- lookupVar env id 
                             return (val,env)
-                        -- This must be done! TODO!!!
-                        ECall id argExps -> return (VBool True,env)
-                                        
+                        ECall id@(Id i) argExps -> do
+                            (vals,newEnv) <- evalExps env argExps
+                            if i `elem` ["printInt", "printDouble", "readInt", "readDouble"]
+                                then do
+                                    val <- checkBuiltIn id vals
+                                    return (val, newEnv)
+                                else case argExps of 
+                                        [] -> do
+                                            func <- lookupFun env id
+                                            execFunc env func []
+                                        _ -> do
+                                            func <- lookupFun env id 
+                                            (vals',(sig,context)) <- evalExps env argExps
+                                            (val',newEnv') <- execFunc (sig,[]) func vals'
+                                            return (val',(sig,context))  
                         -- Maybe change to TBool and add void
                         EInc id -> do
                                     val <- lookupVar env id
@@ -133,6 +152,15 @@ execProg env = do
     execStms env stms
     return ()
 
+checkBuiltIn :: Id -> [Val] -> IO Val
+checkBuiltIn (Id "printInt") (VInt i:_) = do
+    print i
+    return VVoid
+checkBuiltIn (Id "printDouble") (VDouble d:_) = do
+    print d
+    return VVoid
+checkBuiltIn (Id "readInt") _ = VInt <$> readLn
+checkBuiltIn (Id "readDouble") _ = VDouble <$> readLn
 
 execStms :: Env -> [Stm] -> IO (Maybe Val, Env)
 execStms env [] = return (Nothing, env)
@@ -142,31 +170,45 @@ execStms env (stm:stms) = do
                         then return (newVal,newEnv)
                         else execStms newEnv stms
 
+execFunc :: Env -> Func -> [Val] -> IO(Val,Env)
+execFunc env (FDef typ id (FArgument args) (FBody body)) vals = do
+    let params = zip args vals
+    let newEnv = foldl foldlHelp (newBlock env) params
+    (retVal, newEnv') <- execStms newEnv body
+    case retVal of
+        Just (Ret val) -> return (val, exitBlock newEnv')
+        _ -> return (VVoid, exitBlock newEnv')
+
+foldlHelp :: Env -> (Args, Val) -> Env
+foldlHelp env (FArgs _ id, val) = initVar env id val
+
 
 execStm :: Env -> Stm -> IO (Maybe Val, Env)
 execStm env@(sig,top:context) stm = case stm of 
         SExp exp -> do
                 (val, env2) <- evalExp env exp
-                return (Nothing, env2)
-        SDecls typ ids -> return (Nothing, foldl declareVar env ids)
-        
+                return (Just val, env2)
+        SDecls typ ids -> return (Nothing, foldl declareVar env ids) 
         SInit typ id exp -> do
             (val1, env1) <- evalExp env exp
-            return (Nothing, initVar env1 id val1)
+            return (Just val1, initVar env1 id val1)
         SRet exp -> do
             (val1,env1) <- evalExp env exp
-            return (Just val1, env1)
+            return (Just (Ret val1), env1)
         SWhile exp stm1 -> do
                 (val1, env1) <- evalExp env exp
                 if val1 == VBool True
                     then do 
                         (val2, env2) <- execStm (newBlock env1) stm1
                         let newEnv = exitBlock env2
-                        if isJust val2
-                            then return (val2,newEnv)
-                            else execStm newEnv stm
+                        case val2 of 
+                            Just (Ret _ )-> return (val2,newEnv)
+                            _ -> execStm newEnv stm
+                        --if isJust val2
+                          --  then return (val2 ,newEnv)
+                            --else execStm newEnv stm
                     else 
-                        return (Nothing,env1)     
+                        return (Nothing, exitBlock env1)     
         SIf exp stm1 stm2 -> do
                     (val1,env1) <- evalExp env exp
                     let newStm =  if val1 == VBool True 
