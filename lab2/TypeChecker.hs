@@ -9,7 +9,17 @@ import qualified Data.Map as Map
 import CMM.Abs
 import CMM.Print
 import CMM.ErrM
+    
+type Env = (Sig,[Context]) -- functions and context stack
+type Sig = Map Id ([Type],Type) -- function type signature
+type Context = Map Id Type -- variables with their types
 
+typecheck :: Program -> Err ()
+typecheck (Prg prog) = do 
+    let funcs = map getTypes prog
+    env <- foldM (\env (id,typ) -> updateFun env id typ ) emptyEnv funcs
+    isMain env
+    mapM_ (checkDef env) prog
 
 builtIn :: [(Id, ([Type], Type))]
 builtIn = [
@@ -19,24 +29,11 @@ builtIn = [
   (Id "readDouble", ([], TDouble))
   ]
 
-typecheck :: Program -> Err ()
-typecheck (Prg prog) = do 
-    let funcs = map getTypes prog
-    env <- foldM (\env (id,typ) -> updateFun env id typ ) emptyEnv funcs
-    isMain env
-    mapM_ (checkDef env) prog
-    
-
-
-type Env = (Sig,[Context]) -- functions and context stack
-type Sig = Map Id ([Type],Type) -- function type signature
-type Context = Map Id Type -- variables with their types
-
 isMain :: Env -> Err ()
 isMain env = 
         case lookupFun env (Id "main") of
-            Bad _ -> fail "No function main"
-            Ok _ -> return ()
+            Bad _ -> Bad "No function main"
+            Ok ([], TInt) -> return ()
 
 
 inferExp :: Env -> Exp -> Err Type
@@ -46,11 +43,15 @@ inferExp env exp = case exp of
                     ETrue -> Ok TBool
                     EFalse -> Ok TBool
                     EId id -> lookupVar env id
-                    ECall id argExps ->
-                                    do 
+                    ECall id argExps -> do 
                                         (argsTypes,typ) <- lookupFun env id
-                                        mapM_ (uncurry $ checkExp env) $ zip  argsTypes argExps
-                                        return typ
+                                        expTypes <- mapM (\exp -> inferExp env exp) argExps
+                                        if argsTypes == expTypes then
+                                            return typ
+                                        else
+                                            Bad "Function has wrong argument types"
+                                        --mapM_ (uncurry $ checkExp env) $ zip  argsTypes argExps
+                                        --return typ
                 -- Maybe change to TBool and add void
                     EInc id -> do
                                 typ <- lookupVar env id
@@ -98,28 +99,24 @@ inferExp env exp = case exp of
                         if typ1 == typ2  && typ1 /= TVoid then return TBool
                         else
                             Bad "Not equal expressions"
-                        
                     EIneq exp1 exp2 -> do
                         typ1 <- inferExp env exp1     
                         typ2 <- inferExp env exp2
                         if typ1 == typ2  && typ1 /= TVoid then return TBool
                         else
                             Bad "Not equal expressions"
-
                     EConj exp1 exp2 -> do
                         typ1 <- inferExp env exp1     
                         typ2 <- inferExp env exp2
-                        if typ1 == typ2  && typ1 /= TVoid then return TBool
+                        if typ1 == typ2  && typ1 == TBool then return TBool
                         else
                             Bad "Not equal expressions"
-
                     EDisj exp1 exp2 -> do
                         typ1 <- inferExp env exp1     
                         typ2 <- inferExp env exp2
-                        if typ1 == typ2  && typ1 /= TVoid then return TBool
+                        if typ1 == typ2  && typ1 == TBool then return TBool
                         else
                             Bad "Not equal expressions"
-
                     EAss id exp -> do
                                 varTyp <- lookupVar env id
                                 expTyp <- inferExp env exp
@@ -147,13 +144,13 @@ inferBin env exp1 exp2 = case inferExp env exp1 of
 
 checkExp :: Env -> Type -> Exp -> Err ()
 checkExp env typ exp = do
-    typ2 <- inferExp env exp
-    if typ2 == typ then
+    expTyp <- inferExp env exp
+    if expTyp == typ then
         return ()
         else
         Bad $ "type of " ++ printTree exp ++
                "expected " ++ printTree typ ++
-               "but found " ++ printTree typ2
+               "but found " ++ printTree expTyp
 
 
 
@@ -163,27 +160,26 @@ checkStm retTyp env stm = case stm of
                         SExp exp -> do
                             inferExp env exp
                             return env
-                        SDecls typ (id:ids) -> do
-                            if typ == TVoid then Bad "Tried to declare a variable with Void"
-                            else do
-                                newEnv <- updateVar env id typ
-                                checkStm  retTyp env $ SDecls typ ids
-
-                        SDecls typ [] -> return env
+                        SDecls typ ids -> do
+                            foldM (\newEnv id -> updateVar newEnv id typ) env ids
+                            --if typ == TVoid then Bad "Tried to declare a variable with Void"
+                            --else do
+                                --newEnv <- updateVar env id typ
+                                --checkStm  retTyp env $ SDecls typ ids
+                        --SDecls typ [] -> return env
                         SInit typ id exp -> do
                             newEnv <- updateVar env id typ
-                            expTyp <- inferExp env exp
+                            expTyp <- inferExp newEnv exp
                             if typ == expTyp then return newEnv
                             else Bad "Types doesn't match"
-                            
                         SRet exp -> do
                             typ <- inferExp env exp
                             if typ == retTyp then return env
                             else Bad "Return type does not match"
                         SWhile exp stm' -> do
                                 let newEnv = newBlock env
-                                expTyp <- inferExp newEnv exp
-                                checkStm expTyp newEnv stm'
+                                checkExp newEnv TBool exp
+                                checkStm retTyp newEnv stm'
                         SIf exp stm1 stm2 -> do 
                                     let newEnv = newBlock env
                                     checkExp env TBool exp
@@ -191,6 +187,7 @@ checkStm retTyp env stm = case stm of
                                     checkStm retTyp newEnv stm2
                                     return env
                         SBlock stmxs -> do
+                                    let newEnv = newBlock env
                                     checkStms retTyp (newBlock env) stmxs
                                     return env
 
@@ -200,8 +197,8 @@ checkStms retTyp = foldM (checkStm retTyp)
 
 checkDef :: Env -> Func -> Err Env
 checkDef env func@(FDef typ id (FArgument args) (FBody stms)) = do
-                    foldM (\env (FArgs typ id) -> updateVar env id typ) (newBlock env) args
-                    --checkStms typ newEnv stms
+                    newEnv <- foldM (\env (FArgs typ id) -> updateVar env id typ) (newBlock env) args
+                    checkStms typ newEnv stms
 
                  
 -- checkDef env (FDef typ id args (FBody stms)) = do
