@@ -24,18 +24,18 @@ interpret (Prg funcs) = do
     execProg env 
 
 evalExps :: Env -> [Exp] -> IO ([Val],Env)
+evalExps env [] = return ([],env)     
 evalExps env (exp:exps) = do
     (val1,newEnv) <- evalExp env exp
     (val2,newerEnv) <- evalExps newEnv exps
     return (val1:val2, newerEnv)
-evalExps env [] = return ([],env)     
 
 evalExp ::  Env -> Exp -> IO (Val, Env)
-evalExp env@(sig,top:context) exp =  case exp of
+evalExp env exp =  case exp of
                         EInt int -> return (VInt int, env)
                         EDouble doub -> return (VDouble doub, env)
                         ETrue -> return (VBool True, env)
-                        EFalse -> return (VBool True, env)
+                        EFalse -> return (VBool False, env)
                         EId id -> do 
                             val <- lookupVar env id 
                             return (val,env)
@@ -54,75 +54,74 @@ evalExp env@(sig,top:context) exp =  case exp of
                                             (vals',(sig,context)) <- evalExps env argExps
                                             (val',newEnv') <- execFunc (sig,[]) func vals'
                                             return (val',(sig,context))  
-                        -- Maybe change to TBool and add void
-                        EInc id -> do
+                        EInc2 id -> do
                                     val <- lookupVar env id
                                     let newVal = addValue val (VInt 1)
                                     newEnv <- updateVar env id newVal
                                     return (newVal, newEnv)
-                        EDec id ->  do
+                        EDec2 id ->  do
                                     val <- lookupVar env id
                                     let newVal = subValue val (VInt 1)
                                     newEnv <- updateVar env id newVal
                                     return (newVal, newEnv)
-                        EInc2 id ->  do
+                        EInc id ->  do
                                         val <- lookupVar env id
                                         let newVal = addValue val (VInt 1)
                                         newEnv <- updateVar env id newVal
                                         return (val,newEnv)
-                        EDec2 id ->  do
+                        EDec id ->  do
                                         val <- lookupVar env id
                                         let newVal = subValue val (VInt 1)
                                         newEnv <- updateVar env id newVal
                                         return (val,newEnv)
                         EMul exp1 exp2 -> do 
                                             (val1,env1) <- evalExp env exp1
-                                            (val2,env2) <- evalExp env exp2
+                                            (val2,env2) <- evalExp env1 exp2
                                             let newVal = mulValue val1 val2
                                             return (newVal, env2)
                         EDiv exp1 exp2 ->do 
                                             (val1,env1) <- evalExp env exp1
-                                            (val2,env2) <- evalExp env exp2
+                                            (val2,env2) <- evalExp env1 exp2
                                             let newVal = divValue val1 val2
                                             return (newVal, env2)
                         EAdd exp1 exp2 ->do 
                                             (val1,env1) <- evalExp env exp1
-                                            (val2,env2) <- evalExp env exp2
-                                            let newVal = subValue val1 val2
+                                            (val2,env2) <- evalExp env1 exp2
+                                            let newVal = addValue val1 val2
                                             return (newVal, env2)
                         ESub exp1 exp2 ->do 
                                             (val1,env1) <- evalExp env exp1
-                                            (val2,env2) <- evalExp env exp2
+                                            (val2,env2) <- evalExp env1 exp2
                                             let newVal = subValue val1 val2
                                             return (newVal, env2)
                         ELess exp1 exp2 -> do 
                                             (val1,env1) <- evalExp env exp1
-                                            (val2,env2) <- evalExp env exp2
+                                            (val2,env2) <- evalExp env1 exp2
                                             let newVal = lessThanValue val1 val2
                                             return (newVal, env2)
                         EGre exp1 exp2 -> do 
                                             (val1,env1) <- evalExp env exp1
-                                            (val2,env2) <- evalExp env exp2
+                                            (val2,env2) <- evalExp env1 exp2
                                             let newVal = greaterThanValue val1 val2
                                             return (newVal, env2)
                         ELeq exp1 exp2 -> do 
                                             (val1,env1) <- evalExp env exp1
-                                            (val2,env2) <- evalExp env exp2
+                                            (val2,env2) <- evalExp env1 exp2
                                             let newVal = lessThanEqualValue val1 val2
                                             return (newVal, env2)
                         EGeq exp1 exp2 -> do 
                                             (val1,env1) <- evalExp env exp1
-                                            (val2,env2) <- evalExp env exp2
+                                            (val2,env2) <- evalExp env1 exp2
                                             let newVal = greaterThanEqualValue val1 val2
                                             return (newVal, env2)
                         EEqua exp1 exp2 -> do 
                                             (val1,env1) <- evalExp env exp1
-                                            (val2,env2) <- evalExp env exp2
+                                            (val2,env2) <- evalExp env1 exp2
                                             let newVal = equalValue val1 val2
                                             return (newVal, env2)
                         EIneq exp1 exp2 -> do 
                                             (val1,env1) <- evalExp env exp1
-                                            (val2,env2) <- evalExp env exp2
+                                            (val2,env2) <- evalExp env1 exp2
                                             let newVal = notEqualValue val1 val2
                                             return (newVal, env2)
                         EConj exp1 exp2 -> do
@@ -162,13 +161,17 @@ checkBuiltIn (Id "printDouble") (VDouble d:_) = do
 checkBuiltIn (Id "readInt") _ = VInt <$> readLn
 checkBuiltIn (Id "readDouble") _ = VDouble <$> readLn
 
+                        
+
 execStms :: Env -> [Stm] -> IO (Maybe Val, Env)
 execStms env [] = return (Nothing, env)
 execStms env (stm:stms) = do
                     (newVal,newEnv) <- execStm env stm
-                    if isJust newVal
-                        then return (newVal,newEnv)
-                        else execStms newEnv stms
+                    --execStms newEnv stms
+                    case newVal of
+                        Just (Ret val) -> return (newVal, newEnv)
+                        _ -> execStms newEnv stms
+                    
 
 execFunc :: Env -> Func -> [Val] -> IO(Val,Env)
 execFunc env (FDef typ id (FArgument args) (FBody body)) vals = do
@@ -184,7 +187,7 @@ foldlHelp env (FArgs _ id, val) = initVar env id val
 
 
 execStm :: Env -> Stm -> IO (Maybe Val, Env)
-execStm env@(sig,top:context) stm = case stm of 
+execStm env stm = case stm of  
         SExp exp -> do
                 (val, env2) <- evalExp env exp
                 return (Just val, env2)
@@ -201,14 +204,13 @@ execStm env@(sig,top:context) stm = case stm of
                     then do 
                         (val2, env2) <- execStm (newBlock env1) stm1
                         let newEnv = exitBlock env2
-                        case val2 of 
-                            Just (Ret _ )-> return (val2,newEnv)
-                            _ -> execStm newEnv stm
+                        (val3, env3) <- execStm newEnv stm
+                        return (val3, env3)
                         --if isJust val2
-                          --  then return (val2 ,newEnv)
-                            --else execStm newEnv stm
-                    else 
-                        return (Nothing, exitBlock env1)     
+                        --   then return (val2 ,newEnv)
+                        --   else execStm newEnv stm
+                else 
+                    return (Nothing, exitBlock env1)     
         SIf exp stm1 stm2 -> do
                     (val1,env1) <- evalExp env exp
                     let newStm =  if val1 == VBool True 
@@ -229,6 +231,7 @@ declareVar (sig,top:context) id = (sig, newTop:context)
                 where newTop = Map.insert id Nothing top
 
 initVar :: Env -> Id -> Val -> Env
+initVar (sig, []) _ _ = (sig, [])
 initVar (sig, top:context) id val = (sig, newTop:context) 
                 where newTop = Map.insert id (Just val) top
 
@@ -237,7 +240,7 @@ lookupVar (_, []) _ = fail "No variable found"
 lookupVar (sig,first:context) id = case Map.lookup id first of
                                     Just (Just val) -> return val
                                     Just Nothing -> fail "Variable not found"
-                                    Nothing -> fail "Variable not found"
+                                    Nothing -> lookupVar (sig, context) id
 
 lookupFun :: Env -> Id -> IO Func
 lookupFun (sig, _) id = case Map.lookup id sig of
@@ -252,9 +255,8 @@ updateVar (sig, top:stack) id val =
                     else do
                         (newSig, newContext) <- updateVar (sig, stack) id val
                         return (newSig,top:newContext)
-                    
                     where newTop = Map.insert id (Just val) top
-updateVar _ id _ = fail "Can't find variable for id"                        
+updateVar _ id _ = fail $ "Can't find variable for id" ++ printTree id               
                 
 updateFun :: Env -> Func -> IO Env
 updateFun (sig,context) func@(FDef _ id _ _ ) =
@@ -270,7 +272,7 @@ newBlock :: Env -> Env
 newBlock (sig,context) = (sig, Map.empty:context)
 
 emptyEnv :: Env
-emptyEnv  = (Map.empty,[])
+emptyEnv  = (Map.empty,[Map.empty])
 
 addValue :: Val -> Val -> Val
 addValue (VInt a) (VInt b) = VInt $ a + b 
@@ -309,11 +311,15 @@ lessThanEqualValue (VDouble a) (VDouble b) = VBool $ a<=b
 equalValue :: Val -> Val -> Val
 equalValue (VInt a) (VInt b) = VBool $ a == b
 equalValue (VDouble a) (VDouble b) = VBool $ a == b
+equalValue (VInt a) (VDouble b) = VBool $ fromIntegral a == b
+equalValue (VDouble a) (VInt b) = VBool $ a == fromIntegral b
+equalValue (VBool a) (VBool b) = VBool $ a == b
+
 
 notEqualValue :: Val -> Val -> Val
 notEqualValue (VInt a) (VInt b) = VBool $ a/=b
 notEqualValue (VDouble a) (VDouble b) = VBool $ a/=b
-
+notEqualValue (VBool a) (VBool b) = VBool $ a /= b
 
 
 

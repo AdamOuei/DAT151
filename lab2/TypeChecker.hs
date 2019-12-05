@@ -32,8 +32,10 @@ builtIn = [
 isMain :: Env -> Err ()
 isMain env = 
         case lookupFun env (Id "main") of
-            Bad _ -> Bad "No function main"
             Ok ([], TInt) -> return ()
+            _ -> Bad "No function main"
+
+            
 
 
 inferExp :: Env -> Exp -> Err Type
@@ -98,25 +100,25 @@ inferExp env exp = case exp of
                         typ2 <- inferExp env exp2
                         if typ1 == typ2  && typ1 /= TVoid then return TBool
                         else
-                            Bad "Not equal expressions"
+                            Bad "Not equal expressions equal"
                     EIneq exp1 exp2 -> do
                         typ1 <- inferExp env exp1     
                         typ2 <- inferExp env exp2
                         if typ1 == typ2  && typ1 /= TVoid then return TBool
                         else
-                            Bad "Not equal expressions"
+                            Bad "Not equal expressions inequal"
                     EConj exp1 exp2 -> do
                         typ1 <- inferExp env exp1     
                         typ2 <- inferExp env exp2
                         if typ1 == typ2  && typ1 == TBool then return TBool
                         else
-                            Bad "Not equal expressions"
+                            Bad "Not equal expressions conj"
                     EDisj exp1 exp2 -> do
                         typ1 <- inferExp env exp1     
                         typ2 <- inferExp env exp2
                         if typ1 == typ2  && typ1 == TBool then return TBool
                         else
-                            Bad "Not equal expressions"
+                            Bad "Not equal expressions disj"
                     EAss id exp -> do
                                 varTyp <- lookupVar env id
                                 expTyp <- inferExp env exp
@@ -156,11 +158,12 @@ checkExp env typ exp = do
 
 
 checkStm :: Type -> Env -> Stm -> Err Env
-checkStm retTyp env stm = case stm of 
+checkStm retTyp env stm =
+                    case stm of 
                         SExp exp -> do
                             inferExp env exp
                             return env
-                        SDecls typ ids -> do
+                        SDecls typ ids -> 
                             foldM (\newEnv id -> updateVar newEnv id typ) env ids
                             --if typ == TVoid then Bad "Tried to declare a variable with Void"
                             --else do
@@ -180,6 +183,7 @@ checkStm retTyp env stm = case stm of
                                 let newEnv = newBlock env
                                 checkExp newEnv TBool exp
                                 checkStm retTyp newEnv stm'
+                                return env
                         SIf exp stm1 stm2 -> do 
                                     let newEnv = newBlock env
                                     checkExp env TBool exp
@@ -241,4 +245,4 @@ newBlock :: Env -> Env
 newBlock (sig, stack) = (sig, Map.empty:stack)
 
 emptyEnv :: Env
-emptyEnv = (Map.fromList builtIn, [])
+emptyEnv = (Map.fromList builtIn, [Map.empty])
