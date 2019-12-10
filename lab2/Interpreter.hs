@@ -257,10 +257,14 @@ initVar (sig, top:context) id val = (sig, newTop:context)
                 where newTop = Map.insert id (Just val) top
 
 lookupVar :: Env -> Id -> IO Val
-lookupVar (_, []) _ = throw VariableNotFoundException
+lookupVar (_, []) _ =do
+         putStrLn "INTERPRETER ERROR"
+         exitFailure
 lookupVar (sig,first:context) id = case Map.lookup id first of
                                     Just (Just val) -> return val
-                                    Just Nothing -> throw VariableNotFoundException
+                                    Just Nothing -> do
+                                        putStrLn "INTERPRETER ERROR"
+                                        exitFailure
                                     Nothing -> lookupVar (sig, context) id
 
 lookupFun :: Env -> Id -> IO Func
