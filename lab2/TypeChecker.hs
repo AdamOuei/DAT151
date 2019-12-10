@@ -48,7 +48,8 @@ inferExp env exp = case exp of
                     ECall id argExps -> do 
                                         (argsTypes,typ) <- lookupFun env id
                                         expTypes <- mapM (\exp -> inferExp env exp) argExps
-                                        if argsTypes == expTypes then
+                                        --let ls = map (uncurry $ isValidAss) $ zip argsTypes expTypes
+                                        if argsTypes == expTypes then --and ls then
                                             return typ
                                         else
                                             Bad "Function has wrong argument types"
@@ -98,13 +99,13 @@ inferExp env exp = case exp of
                     EEqua exp1 exp2 -> do
                         typ1 <- inferExp env exp1     
                         typ2 <- inferExp env exp2
-                        if typ1 == typ2  && typ1 /= TVoid then return TBool
+                        if (isValidType typ1 typ2) then return TBool
                         else
                             Bad "Not equal expressions equal"
                     EIneq exp1 exp2 -> do
                         typ1 <- inferExp env exp1     
                         typ2 <- inferExp env exp2
-                        if typ1 == typ2  && typ1 /= TVoid then return TBool
+                        if (isValidType typ1 typ2) then return TBool
                         else
                             Bad "Not equal expressions inequal"
                     EConj exp1 exp2 -> do
@@ -122,7 +123,7 @@ inferExp env exp = case exp of
                     EAss id exp -> do
                                 varTyp <- lookupVar env id
                                 expTyp <- inferExp env exp
-                                if expTyp == varTyp then return expTyp
+                                if isValidAss varTyp expTyp then return varTyp
                                 else Bad "Not correct assignemnt" 
                     --ETyped exp typ -> case checkExp env typ exp of
                       --                  Ok _ -> Ok typ
@@ -131,6 +132,19 @@ inferExp env exp = case exp of
 isBad :: Err a -> Bool
 isBad (Bad _) = True
 isBad _ = False
+
+isValidArgs :: [Type] -> [Type] -> Bool
+isValidArgs (typ1:[]) (typ2:[]) = isValidAss typ1 typ2
+isValidArgs (typ1:xs) (typ2:ys) = if isValidAss typ1 typ2 then isValidArgs xs ys else False
+
+isValidAss :: Type -> Type -> Bool
+isValidAss TDouble TInt = True
+isValidAss typ1 typ2 = typ1 == typ2
+
+isValidType :: Type -> Type -> Bool
+isValidType TInt TDouble = True
+isValidType TDouble TInt = True
+isValidType typ1 typ2 = typ1 == typ2 && typ1 /= TVoid
 
 inferBin :: Env -> Exp -> Exp -> Err Type
 inferBin env exp1 exp2 = case inferExp env exp1 of
@@ -173,7 +187,7 @@ checkStm retTyp env stm =
                         SInit typ id exp -> do
                             newEnv <- updateVar env id typ
                             expTyp <- inferExp newEnv exp
-                            if typ == expTyp then return newEnv
+                            if isValidAss typ expTyp then return newEnv
                             else Bad "Types doesn't match"
                         SRet exp -> do
                             typ <- inferExp env exp
@@ -222,8 +236,8 @@ lookupVar env@(sig,top:stack) id = case Map.lookup id top of
 lookupFun :: Env -> Id -> Err ([Type],Type)
 lookupFun (sig, _) id = 
             case Map.lookup id sig of
-                Nothing -> Bad "No function found"
                 Just pair -> Ok pair
+                Nothing -> Bad "No function found"
 
 updateVar :: Env -> Id -> Type -> Err Env
 updateVar _ _ TVoid = Bad "Can not assign variable as void"

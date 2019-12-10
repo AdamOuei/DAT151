@@ -1,6 +1,9 @@
 module Interpreter where
 
 import Control.Monad
+import Control.Exception
+
+import System.Exit 
 
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -17,6 +20,11 @@ type Context = Map Id (Maybe Val) -- variables with their types
 
 data Val = VInt Integer | VDouble Double | VBool Bool | VVoid | Ret Val
     deriving (Eq,Show)
+
+data RunTimeException = VariableNotFoundException
+    deriving Show
+
+instance Exception RunTimeException
 
 interpret :: Program -> IO ()
 interpret (Prg funcs) = do
@@ -40,7 +48,7 @@ evalExp env exp =  case exp of
                             val <- lookupVar env id 
                             return (val,env)
                         ECall id@(Id i) argExps -> do
-                            (vals,newEnv) <- evalExps env argExps
+                            (vals,newEnv@(sig,context)) <- evalExps env argExps
                             if i `elem` ["printInt", "printDouble", "readInt", "readDouble"]
                                 then do
                                     val <- checkBuiltIn id vals
@@ -51,8 +59,8 @@ evalExp env exp =  case exp of
                                             execFunc env func []
                                         _ -> do
                                             func <- lookupFun env id 
-                                            (vals',(sig,context)) <- evalExps env argExps
-                                            (val',newEnv') <- execFunc (sig,[]) func vals'
+                                            --(vals',(sig,context)) <- evalExps env argExps
+                                            (val',newEnv') <- execFunc (sig,[]) func vals
                                             return (val',(sig,context))  
                         EInc2 id -> do
                                     val <- lookupVar env id
@@ -127,13 +135,13 @@ evalExp env exp =  case exp of
                         EConj exp1 exp2 -> do
                                             (val1, env1) <- evalExp env exp1
                                             case val1 of
-                                                VBool True -> return (VBool True, env1)
-                                                VBool False -> evalExp env exp2
+                                                VBool True -> evalExp env exp2
+                                                VBool False ->return (VBool False, env1) 
                         EDisj exp1 exp2 -> do
                                             (val1,env1) <- evalExp env exp1
                                             case val1 of 
-                                                VBool True -> evalExp env1 exp2
-                                                VBool False -> return (VBool False,env1)
+                                                VBool True -> return (VBool True,env1)
+                                                VBool False -> evalExp env1 exp2
                         EAss id exp -> do
                                         (val1,env1) <- evalExp env exp 
                                         env2 <- updateVar env1 id val1
@@ -157,6 +165,10 @@ checkBuiltIn (Id "printInt") (VInt i:_) = do
     return VVoid
 checkBuiltIn (Id "printDouble") (VDouble d:_) = do
     print d
+    return VVoid
+checkBuiltIn (Id "printDouble") (VInt d: _)= do
+    let val = fromIntegral d
+    print val
     return VVoid
 checkBuiltIn (Id "readInt") _ = VInt <$> readLn
 checkBuiltIn (Id "readDouble") _ = VDouble <$> readLn
@@ -204,13 +216,16 @@ execStm env stm = case stm of
                     then do 
                         (val2, env2) <- execStm (newBlock env1) stm1
                         let newEnv = exitBlock env2
-                        (val3, env3) <- execStm newEnv stm
-                        return (val3, env3)
+                        if isRet val2
+                            then return (val2,newEnv)
+                            else do
+                            (val3, env3) <- execStm (newBlock newEnv) (SWhile exp stm1)
+                            return (val3, env3)
                         --if isJust val2
                         --   then return (val2 ,newEnv)
                         --   else execStm newEnv stm
                 else 
-                    return (Nothing, exitBlock env1)     
+                    return (Nothing, env1)     
         SIf exp stm1 stm2 -> do
                     (val1,env1) <- evalExp env exp
                     let newStm =  if val1 == VBool True 
@@ -223,7 +238,13 @@ execStm env stm = case stm of
                 (newVal, newEnv) <- execStms (newBlock env) stms
                 return (newVal, exitBlock newEnv)
 
-                        
+                
+
+isRet :: Maybe Val -> Bool
+isRet val = case val of 
+        Just (Ret _ ) -> True
+        _ -> False
+
 
 
 declareVar :: Env -> Id -> Env
@@ -236,10 +257,10 @@ initVar (sig, top:context) id val = (sig, newTop:context)
                 where newTop = Map.insert id (Just val) top
 
 lookupVar :: Env -> Id -> IO Val
-lookupVar (_, []) _ = fail "No variable found"
+lookupVar (_, []) _ = throw VariableNotFoundException
 lookupVar (sig,first:context) id = case Map.lookup id first of
                                     Just (Just val) -> return val
-                                    Just Nothing -> fail "Variable not found"
+                                    Just Nothing -> throw VariableNotFoundException
                                     Nothing -> lookupVar (sig, context) id
 
 lookupFun :: Env -> Id -> IO Func
@@ -287,26 +308,44 @@ subValue (VDouble a) (VInt b) = VDouble $ a - fromIntegral b
 mulValue :: Val -> Val -> Val
 mulValue (VInt a) (VInt b) = VInt $ a*b
 mulValue (VDouble a) (VDouble b) = VDouble $ a*b
+mulValue (VDouble a) (VInt b) = VDouble $ a * fromIntegral b
+mulValue (VInt a) (VDouble b) = VDouble $ fromIntegral a * b
 
 divValue :: Val -> Val -> Val
 divValue (VInt a) (VInt b) = VInt $ a `div` b
 divValue (VDouble a) (VDouble b) = VDouble $ a/b
+divValue (VDouble a) (VInt b) = VDouble $ a / fromIntegral b
+divValue (VInt a) (VDouble b) = VDouble $ fromIntegral a / b
 
 greaterThanValue :: Val -> Val -> Val
 greaterThanValue (VInt a) (VInt b) = VBool $ a > b
 greaterThanValue (VDouble a) (VDouble b) = VBool $ a > b
+greaterThanValue val1 val2 = case val1 of 
+                            VDouble a -> case val2 of
+                                VInt b -> VBool $ a > fromIntegral b
+                            VInt a -> case val2 of 
+                                VDouble b -> VBool $ fromIntegral a < b
 
 lessThanValue :: Val -> Val -> Val
 lessThanValue (VInt a) (VInt b) = VBool $ a<b
 lessThanValue (VDouble a) (VDouble b) = VBool $ a<b
+lessThanValue val1 val2 = case val1 of 
+    VDouble a -> case val2 of
+        VInt b -> VBool $ a > fromIntegral b
+    VInt a -> case val2 of 
+        VDouble b -> VBool $ fromIntegral a < b
 
 greaterThanEqualValue :: Val -> Val -> Val
 greaterThanEqualValue (VInt a) (VInt b) = VBool $ a >= b
 greaterThanEqualValue (VDouble a) (VDouble b) = VBool $ a >= b
+greaterThanEqualValue (VInt a) (VDouble b) = VBool $ fromIntegral a >= b
+greaterThanEqualValue (VDouble a) (VInt b) = VBool $ a >= fromIntegral b
 
 lessThanEqualValue :: Val -> Val -> Val
 lessThanEqualValue (VInt a) (VInt b) = VBool $ a<=b
 lessThanEqualValue (VDouble a) (VDouble b) = VBool $ a<=b
+lessThanEqualValue (VInt a) (VDouble b) = VBool $ fromIntegral a<=b
+lessThanEqualValue (VDouble a) (VInt b) = VBool $ a<= fromIntegral b
 
 equalValue :: Val -> Val -> Val
 equalValue (VInt a) (VInt b) = VBool $ a == b
