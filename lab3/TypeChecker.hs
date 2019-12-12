@@ -1,3 +1,9 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TupleSections #-}
+
+-- | Type checker for C--, producing typed syntax from ASTs.
+
 module TypeChecker where
 
 import Control.Applicative
@@ -14,17 +20,20 @@ import qualified Data.Set as Set
 
 
 import CMM.Abs
-import CMM.Print
-import CMM.ErrM
+import CMM.Print (printTree)
+import CMM.ErrM (Err(Ok, Bad))
 
 import qualified Annotated as A
-    
-type Env = (Sig,[Context]) -- functions and context stack
-type Sig = Map Id ([Type],Type) -- function type signature
-type Context = Map Id Type -- variables with their types
 
-typecheck :: Program -> Err ()
+data FunType = FunType Type [Type]
+    
+-- type Env = (Sig,[Context]) -- functions and context stack
+-- type Sig = Map Id ([Type],Type) -- function type signature
+-- type Context = Map Id Type -- variables with their types
+
+typecheck :: Program -> Err A.Program
 typecheck (Prg prog) = do 
+    -- map over each Func (in prog) and return a List of PDef (see Annotated)
     let funcs = map getTypes prog
     env <- foldM (\env (id,typ) -> updateFun env id typ ) emptyEnv funcs
     isMain env
