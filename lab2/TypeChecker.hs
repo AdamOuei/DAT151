@@ -45,6 +45,13 @@ inferExp env exp = case exp of
                     ETrue -> Ok TBool
                     EFalse -> Ok TBool
                     EId id -> lookupVar env id
+                    ECall id@(Id "printDouble") argExps -> do
+                                            (argsTypes,typ) <- lookupFun env id
+                                            expTypes <- mapM (\exp -> inferExp env exp) argExps 
+                                            if (TInt `elem` argsTypes || TDouble `elem` argsTypes) && length argExps == 1 then
+                                                return typ
+                                            else
+                                                Bad "Function has wrong argument types"
                     ECall id argExps -> do 
                                         (argsTypes,typ) <- lookupFun env id
                                         expTypes <- mapM (\exp -> inferExp env exp) argExps

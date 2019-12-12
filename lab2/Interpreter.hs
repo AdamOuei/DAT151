@@ -163,17 +163,16 @@ checkBuiltIn :: Id -> [Val] -> IO Val
 checkBuiltIn (Id "printInt") (VInt i:_) = do
     print i
     return VVoid
-checkBuiltIn (Id "printDouble") (VDouble d:_) = do
-    print d
-    return VVoid
-checkBuiltIn (Id "printDouble") (VInt d: _)= do
-    let val = fromIntegral d
-    print val
+checkBuiltIn (Id "printDouble") (val:_) = do
+    print $ toDouble val
     return VVoid
 checkBuiltIn (Id "readInt") _ = VInt <$> readLn
 checkBuiltIn (Id "readDouble") _ = VDouble <$> readLn
 
-                        
+toDouble :: Val -> Double
+toDouble val = case val of
+    VDouble d -> d
+    VInt i -> fromIntegral i
 
 execStms :: Env -> [Stm] -> IO (Maybe Val, Env)
 execStms env [] = return (Nothing, env)
