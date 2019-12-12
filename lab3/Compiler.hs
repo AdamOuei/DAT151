@@ -55,3 +55,30 @@ compile name _prg = header
     , ""
     , ";; END HEADER"
     ]
+
+
+compileExp :: Exp -> Compile ()
+
+
+compileStm :: Stm -> Compile ()
+
+compileFun :: FDef -> Compile ()
+
+emit :: Code -> Compile ()
+
+lookupAddr :: Id -> Adress
+
+lookupFun :: FDef -> Type
+
+extend :: Id -> Type -> Compile ()
+
+extend :: FDef -> Compile ()
+
+newBlock :: Compile ()
+
+exitBlock :: Compile ()
+
+emptyEnv :: Compile ()
+
+newLabel :: Label
+
