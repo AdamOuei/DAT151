@@ -1,9 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE TupleSections #-}
-
--- | Type checker for C--, producing typed syntax from ASTs.
-
 module TypeChecker where
 
 import Control.Applicative
@@ -20,24 +14,24 @@ import qualified Data.Set as Set
 
 
 import CMM.Abs
-import CMM.Print (printTree)
-import CMM.ErrM (Err(Ok, Bad))
+import CMM.Print
+import CMM.ErrM
 
 import qualified Annotated as A
+    
+type Env = (Sig,[Context]) -- functions and context stack
+type Sig = Map Id ([Type],Type) -- function type signature
+type Context = Map Id Type -- variables with their types
 
 data FunType = FunType Type [Type]
-    
--- type Env = (Sig,[Context]) -- functions and context stack
--- type Sig = Map Id ([Type],Type) -- function type signature
--- type Context = Map Id Type -- variables with their types
 
 typecheck :: Program -> Err A.Program
 typecheck (Prg prog) = do 
-    -- map over each Func (in prog) and return a List of PDef (see Annotated)
     let funcs = map getTypes prog
     env <- foldM (\env (id,typ) -> updateFun env id typ ) emptyEnv funcs
     isMain env
-    mapM_ (checkDef env) prog
+    list <- mapM (checkDef env) prog
+    return PDefs list
 
 builtIn :: [(Id, ([Type], Type))]
 builtIn = [
@@ -56,7 +50,7 @@ isMain env =
             
 
 
-inferExp :: Env -> Exp -> Err Type
+inferExp :: Env -> Exp -> Err Type  
 inferExp env exp = case exp of
                     EInt int -> Ok TInt
                     EDouble doub -> Ok TDouble
@@ -66,14 +60,10 @@ inferExp env exp = case exp of
                     ECall id argExps -> do 
                                         (argsTypes,typ) <- lookupFun env id
                                         expTypes <- mapM (\exp -> inferExp env exp) argExps
-                                        --let ls = map (uncurry $ isValidAss) $ zip argsTypes expTypes
                                         if argsTypes == expTypes then --and ls then
                                             return typ
                                         else
                                             Bad "Function has wrong argument types"
-                                        --mapM_ (uncurry $ checkExp env) $ zip  argsTypes argExps
-                                        --return typ
-                -- Maybe change to TBool and add void
                     EInc id -> do
                                 typ <- lookupVar env id
                                 if typ `elem` [TInt,TDouble] then
@@ -189,61 +179,58 @@ checkExp env typ exp = do
 
 
 
-checkStm :: Type -> Env -> Stm -> Err Env
+checkStm :: Type -> Env -> Stm -> Err (Env, A.Stm)
 checkStm retTyp env stm =
                     case stm of 
                         SExp exp -> do
-                            inferExp env exp
-                            return env
-                        SDecls typ ids -> 
-                            foldM (\newEnv id -> updateVar newEnv id typ) env ids
-                            --if typ == TVoid then Bad "Tried to declare a variable with Void"
-                            --else do
-                                --newEnv <- updateVar env id typ
-                                --checkStm  retTyp env $ SDecls typ ids
-                        --SDecls typ [] -> return env
+                            typ <- inferExp env exp
+                            return (env, A.SExp typ exp)
+                        SDecls typ ids -> do
+                                env' <- foldM (\newEnv id -> updateVar newEnv id typ) env ids
+                                return (env', A.SDecls typ ids)               
                         SInit typ id exp -> do
                             newEnv <- updateVar env id typ
                             expTyp <- inferExp newEnv exp
-                            if isValidAss typ expTyp then return newEnv
+                            if isValidAss typ expTyp then return (newEnv, A.SInit typ id exp)
                             else Bad "Types doesn't match"
                         SRet exp -> do
                             typ <- inferExp env exp
-                            if typ == retTyp then return env
+                            if typ == retTyp then return (env, A.SRet typ exp)
                             else Bad "Return type does not match"
                         SWhile exp stm' -> do
                                 let newEnv = newBlock env
                                 checkExp newEnv TBool exp
-                                checkStm retTyp newEnv stm'
-                                return env
+                                (env', stm'') <- checkStm retTyp newEnv stm'
+                                -- maybe env'
+                                return (env, A.SWhile exp stm'')
                         SIf exp stm1 stm2 -> do 
                                     let newEnv = newBlock env
                                     checkExp env TBool exp
-                                    checkStm retTyp newEnv stm1
-                                    checkStm retTyp newEnv stm2
-                                    return env
+                                     (env', stm1')<-  checkStm retTyp newEnv stm1
+                                     (env'',stm2') <- checkStm retTyp newEnv stm2
+                                     -- maybe env'' (?)
+                                    return (env, A.SIf exp stm1' stm2')
                         SBlock stmxs -> do
                                     let newEnv = newBlock env
-                                    checkStms retTyp (newBlock env) stmxs
-                                    return env
+                                     (env, stms') <- checkStms retTyp (newBlock env) stmxs
+                                     return (env, A.SBlock stms')
 
 
-checkStms :: Type -> Env ->  [Stm] -> Err Env
-checkStms retTyp = foldM (checkStm retTyp)
+checkStms :: Type -> Env ->  [Stm] -> Err (Env, [A.Stm])
+checkStms typ env [] = return (env, [])
+checkStms typ env stm:stms = do 
+    (env', astm) <- checkStm typ env stm
+    (env'', astms) <- checkStms typ env' stms
+    return (env'', astm:astms)
 
-checkDef :: Env -> Func -> Err Env
+checkDef :: Env -> Func -> Err A.Func
 checkDef env func@(FDef typ id (FArgument args) (FBody stms)) = do
                     newEnv <- foldM (\env (FArgs typ id) -> updateVar env id typ) (newBlock env) args
-                    checkStms typ newEnv stms
-
-                 
--- checkDef env (FDef typ id args (FBody stms)) = do
---                                        newEnv <-  updateFun env id (getTypes args ,typ)
-  --                                      checkStms typ newEnv stms
-                                                 
+                    let (env, astms') = checkStms typ newEnv stms                              
+                    return PDef typ id args astms'
 
 getTypes :: Func -> (Id, ([Type],Type))
-getTypes (FDef typ id (FArgument args) body) = (id,  ( (map (\(FArgs typ _) -> typ) args ),typ))
+getTypes (FDef typ id (FArgument args) body) = (id, ( (map (\(FArgs typ _) -> typ) args ),typ))
 
 lookupVar :: Env -> Id -> Err Type
 lookupVar (_, []) (Id id) = Bad $  "Variable does not exist " ++ printTree id
