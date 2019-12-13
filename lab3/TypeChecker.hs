@@ -206,22 +206,22 @@ checkStm retTyp env stm =
                         SIf exp stm1 stm2 -> do 
                                     let newEnv = newBlock env
                                     checkExp env TBool exp
-                                     (env', stm1')<-  checkStm retTyp newEnv stm1
-                                     (env'',stm2') <- checkStm retTyp newEnv stm2
+                                    (env', stm1')<-  checkStm retTyp newEnv stm1
+                                    (env'',stm2') <- checkStm retTyp newEnv stm2
                                      -- maybe env'' (?)
                                     return (env, A.SIf exp stm1' stm2')
                         SBlock stmxs -> do
                                     let newEnv = newBlock env
-                                     (env, stms') <- checkStms retTyp (newBlock env) stmxs
-                                     return (env, A.SBlock stms')
+                                    (env, stms') <- checkStms retTyp (newBlock env) stmxs
+                                    return (env, A.SBlock stms')
 
 
 checkStms :: Type -> Env ->  [Stm] -> Err (Env, [A.Stm])
 checkStms typ env [] = return (env, [])
-checkStms typ env stm:stms = do 
-    (env', astm) <- checkStm typ env stm
-    (env'', astms) <- checkStms typ env' stms
-    return (env'', astm:astms)
+checkStms typ env (stm:stms) = do 
+                        (env', astm) <- checkStm typ env stm
+                        (env'', astms) <- checkStms typ env' stms
+                        return (env'', astm:astms)
 
 checkDef :: Env -> Func -> Err (Env, A.Func) 
 checkDef env func@(FDef typ id (FArgument args) (FBody stms)) = do

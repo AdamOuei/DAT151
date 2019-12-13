@@ -21,64 +21,64 @@ import Annotated
 
 -- | Entry point.
 
-compile
-  :: String  -- ^ Class name.
-  -> Program -- ^ Type-annotated program.
-  -> String  -- ^ Generated jasmin source file content.
-compile name _prg = header
-  where
-  header :: String
-  header = unlines
-    [ ";; BEGIN HEADER"
-    , ""
-    , ".class public " ++ name
-    , ".super java/lang/Object"
-    , ""
-    , ".method public <init>()V"
-    , "  .limit locals 1"
-    , ""
-    , "  aload_0"
-    , "  invokespecial java/lang/Object/<init>()V"
-    , "  return"
-    , ""
-    , ".end method"
-    , ""
-    , ".method public static main([Ljava/lang/String;)V"
-    , "  .limit locals 1"
-    , "  .limit stack  1"
-    , ""
-    , "  invokestatic " ++ name ++ "/main()I"
-    , "  pop"
-    , "  return"
-    , ""
-    , ".end method"
-    , ""
-    , ";; END HEADER"
-    ]
+-- compile
+--   :: String  -- ^ Class name.
+--   -> Program -- ^ Type-annotated program.
+--   -> String  -- ^ Generated jasmin source file content.
+-- compile name _prg = header
+--   where
+--   header :: String
+--   header = unlines
+--     [ ";; BEGIN HEADER"
+--     , ""
+--     , ".class public " ++ name
+--     , ".super java/lang/Object"
+--     , ""
+--     , ".method public <init>()V"
+--     , "  .limit locals 1"
+--     , ""
+--     , "  aload_0"
+--     , "  invokespecial java/lang/Object/<init>()V"
+--     , "  return"
+--     , ""
+--     , ".end method"
+--     , ""
+--     , ".method public static main([Ljava/lang/String;)V"
+--     , "  .limit locals 1"
+--     , "  .limit stack  1"
+--     , ""
+--     , "  invokestatic " ++ name ++ "/main()I"
+--     , "  pop"
+--     , "  return"
+--     , ""
+--     , ".end method"
+--     , ""
+--     , ";; END HEADER"
+--     ]
 
 
-compileExp :: Exp -> Compile ()
+-- compileExp :: Exp -> Compile ()
 
 
-compileStm :: Stm -> Compile ()
+-- compileStm :: Stm -> Compile ()
 
-compileFun :: FDef -> Compile ()
+-- compileFun :: FDef -> Compile ()
 
-emit :: Code -> Compile ()
+-- emit :: Code -> Compile ()
 
-lookupAddr :: Id -> Adress
+-- lookupAddr :: Id -> Adress
 
-lookupFun :: FDef -> Type
+-- lookupFun :: FDef -> Type
 
-extend :: Id -> Type -> Compile ()
+-- extendId :: Id -> Type -> Compile ()
 
-extend :: FDef -> Compile ()
+-- extendFunc :: FDef -> Compile ()
 
-newBlock :: Compile ()
+-- newBlock :: Compile ()
 
-exitBlock :: Compile ()
+-- exitBlock :: Compile ()
 
-emptyEnv :: Compile ()
+-- emptyEnv :: Compile ()
 
-newLabel :: Label
+-- newLabel :: Label
 

@@ -6,7 +6,7 @@ module Annotated where
 
 
 import Data.Char
-import CMM.Abs (Id(..), Type(..), Arg(..))
+import CMM.Abs (Id(..), Type(..), Args(..))
 
 -- This is a stub for typed ASTs produced by the type checker
 -- as input for the compiler.
@@ -17,7 +17,7 @@ import CMM.Abs (Id(..), Type(..), Arg(..))
 data Program = PDefs [Func]
   deriving (Eq, Ord, Show, Read)
 
-data Func = DFun Type Id [Arg] [Stm]
+data Func = DFun Type Id [Args] [Stm]
   deriving (Eq, Ord, Show, Read)
 
 data Stm 
@@ -31,8 +31,7 @@ data Stm
   deriving (Eq, Ord, Show, Read)
 
 data Exp 
-    =
-    | ETrue
+    = ETrue
     | EFalse
     | EInt Integer
     | EDouble Double
@@ -93,24 +92,25 @@ instance Print a => Print [a] where
 
 instance Print Char where
   prt _ s = doc (showChar '\'' . mkEsc '\'' s . showChar '\'')
-  prtList _ s = doc (showChar '"' . concatS (map (mkEsc '"') s) . showChar)
+  prtList _ s = doc (showChar '"' . concatS (map (mkEsc '"') s) . showChar '"')
+
 
 mkEsc :: Char -> Char -> ShowS
 mkEsc q s = case s of
   _ | s == q -> showChar '\\' . showChar s
   '\\' -> showString "\\\\"
   '\n' -> showString "\\n"
-  '\t' -> showSTring "\\t"
-  _ -> showChar 
+  '\t' -> showString "\\t"
+  _ -> showChar s
     
 prPrec :: Int -> Int -> Doc -> Doc
-prePrec i j = if j < i then parenth else id
+prPrec i j = if j < i then parenth else id
 
 instance Print Integer where
-  prt _ x = doc (show x)
+  prt _ x = doc (shows x)
 
 instance Print Double where
-  prt _ x = doc (show x)
+  prt _ x = doc (shows x)
 
 instance Print Id where
   prt _ (Id i) = doc (showString i)
@@ -119,15 +119,15 @@ instance Print Id where
 
 instance Print Program where
   prt i e = case e of
-    Prog funcs -> prPrec i 0 (concatD [prt 0 defs])
+    PDefs funcs -> prPrec i 0 (concatD [prt 0 funcs])
 
-instance Print Def where
+instance Print Func where
   prt i e = case e of 
-    FDef typ id args stms -> prPrec i 0 (concatD [prt 0 typ, prt 0 id, doc (showString "("), prt 0 args, doc (showString ")"), doc (showString "{"), prt 0 stms, doc (showString "}")])
-  prtList _ = (concatD [])
+    DFun typ id args stms -> prPrec i 0 (concatD [prt 0 typ, prt 0 id, doc (showString "("), prt 0 args, doc (showString ")"), doc (showString "{"), prt 0 stms, doc (showString "}")])
+  prtList _ []= (concatD [])
   prtList _ (x:xs) = (concatD [prt 0 x, doc (showString ","), prt 0 xs])
 
-instance Print Arg where
+instance Print Args where
   prt i e = case e of
     FArgs typ id -> prPrec i 0 (concatD [prt 0 typ, prt 0 id])
   prtList _ [] = (concatD [])
@@ -163,7 +163,7 @@ instance Print Exp where
 
 instance Print Type where
   prt i e = case e of
-    Type_bool   -> prPrec i 0 (doc (showString "bool"  ))
-    Type_int    -> prPrec i 0 (doc (showString "int"   ))
-    Type_double -> prPrec i 0 (doc (showString "double"))
-    Type_void   -> prPrec i 0 (doc (showString "void"  ))
+    TBool   -> prPrec i 0 (doc (showString "bool"  ))
+    TInt    -> prPrec i 0 (doc (showString "int"   ))
+    TDouble-> prPrec i 0 (doc (showString "double"))
+    TVoid   -> prPrec i 0 (doc (showString "void"  ))
