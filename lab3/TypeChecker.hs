@@ -223,11 +223,11 @@ checkStms typ env stm:stms = do
     (env'', astms) <- checkStms typ env' stms
     return (env'', astm:astms)
 
-checkDef :: Env -> Func -> Err A.Func
+checkDef :: Env -> Func -> Err (Env, A.Func) 
 checkDef env func@(FDef typ id (FArgument args) (FBody stms)) = do
                     newEnv <- foldM (\env (FArgs typ id) -> updateVar env id typ) (newBlock env) args
-                    let (env, astms') = checkStms typ newEnv stms                              
-                    return PDef typ id args astms'
+                    (newEnv', astms') <- checkStms typ newEnv stms                              
+                    return (newEnv', PDef typ id args astms')
 
 getTypes :: Func -> (Id, ([Type],Type))
 getTypes (FDef typ id (FArgument args) body) = (id, ( (map (\(FArgs typ _) -> typ) args ),typ))
