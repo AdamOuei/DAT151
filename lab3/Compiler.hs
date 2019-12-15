@@ -64,7 +64,50 @@ compile name _prg = header
     ]
 
 
---compileStm :: Exp -> Compile ()
+compileStm :: Stm -> Compile ()
+compileStm stm = 
+          case stm of
+            case stm of 
+              SExp exp -> do
+                compileExp exp
+                 
+              SDecls typ ids -> do
+                    emit "lol"
+              SInit typ id exp -> do
+                  compileExp
+                  val <- lookupAddr id
+                  emit $ "istore" ++ show addr
+              SRet exp -> do
+                  compileExp exp
+                  emit "ireturn"
+                  -- Newlabel maybe?
+              SWhile exp stm' -> do
+                   emit $ "TEST:"
+                   compileExp exp
+                   emit $ "ifeq END"
+                   newBlock
+                   compileStm stm'
+                   exitBlock
+                   emit $ "goto TEST"                
+                   emit $ "END:"
+              SIf exp stm1 stm2 -> do
+                  false <- newLabel "FALSE"
+                  true <- newLabel "TRUE"
+                  compileExp exp
+                  newBlock
+                  emit $ "ifeq FALSE"
+                  compileStm stm1
+                  emit $ "goto TRUE"
+                  emit $ "FALSE:"
+                  compileStm stm2
+                  emit $ "TRUE:"
+                  exitBlock
+              SBlock stmxs -> do
+                    newBlock
+                    mapM_ compileStm stmxs
+                    exitBlock
+                  
+
 
 
 compileExp :: Stm -> State Env ()
@@ -75,26 +118,26 @@ compile stm =
                     ETrue -> emit "bipush 1"
                     EFalse -> emit "bipush 0"
                     EId id -> do
-                            val <- lookupVar id
-                            emit $ "iload" ++ show val 
+                            addr <- lookupAddr id
+                            emit $ "iload" ++ show addr 
                     ECall id argExps -> do
                       emit "2"
                     EInc id -> do
-                       val <- lookupVar id
-                       emit $ "iload" ++ show val
-                       emit $ "iinc" ++ show val ++ "1"
+                       addr <- lookupAddr id
+                       emit $ "iload" ++ show addr
+                       emit $ "iinc" ++ show addr ++ "1"
                     EDec id -> do
-                      val <- lookupVar id
-                      emit $ "iload" ++ show val
-                      emit $ "iinc" ++ show val ++ "-1"
+                      addr <- lookupAddr id
+                      emit $ "iload" ++ show addr
+                      emit $ "iinc" ++ show addr ++ "-1"
                     EInc2 id ->do
-                      val <- lookupVar id
-                      emit $ "iinc" ++ show val ++ "1"
-                      emit $ "iload" ++ show val
+                      addr <- lookupAddr id
+                      emit $ "iinc" ++ show addr ++ "1"
+                      emit $ "iload" ++ show addr
                     EDec2 id ->do
-                      val <- lookupVar id
-                      emit $ "iinc" ++ show val ++ "- 1"
-                      emit $ "iload" ++ show val
+                      addr <- lookupAddr id
+                      emit $ "iinc" ++ show addr ++ "- 1"
+                      emit $ "iload" ++ show addr
                     EMul exp1 exp2 -> do
                         compileExp exp1
                         compileExp exp2
@@ -146,14 +189,20 @@ compile stm =
                       emit "ifne"
                     EAss id exp -> do
                       compileExp exp
-                      val <- lookupVar id
+                      addr <- lookupAddr id
                       emit "dup"
-                      emit $ "istore" ++ show val
+                      emit $ "istore" ++ show addr
 
 
 -- compileFun :: FDef -> Compile ()
 
--- emit :: Code -> Compile ()
+emit :: Instruction -> State Env ()
+emit i = emit' $ " " ++ i
+
+emit' :: String -> State Env ()
+emit' str = modify (\env -> env{code = str : code env})
+
+
 
 lookupAddr :: Id -> State Env Int
 lookupAddr id = gets $ helper . vars
