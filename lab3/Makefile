@@ -20,6 +20,9 @@ all : lab3 Runtime.class
 lab3 : $(files) CMM/Test
 	ghc --make lab3.hs -o lab3
 
+test: lab3
+	./lab3 testFiles/testFile.cc
+
 # Rules to build the parser:
 
 CMM/Test.hs CMM/Lex.x CMM/Layout.hs CMM/Par.y : CMM.cf
