@@ -302,11 +302,13 @@ addValue :: Val -> Val -> Val
 addValue (VInt a) (VInt b) = VInt $ a + b 
 addValue (VDouble a) (VDouble b) = VDouble $ a + b 
 addValue (VDouble a) (VInt b) = VDouble $ a + fromIntegral b
+addValue  (VInt a )(VDouble b)  = VDouble $ fromIntegral a +  b
 
 subValue :: Val -> Val -> Val
 subValue (VInt a) (VInt b) = VInt $ a-b
 subValue (VDouble a) (VDouble b) = VDouble $ a-b
 subValue (VDouble a) (VInt b) = VDouble $ a - fromIntegral b
+subValue  (VInt a )(VDouble b)  = VDouble $ fromIntegral a - b
 
 mulValue :: Val -> Val -> Val
 mulValue (VInt a) (VInt b) = VInt $ a*b
@@ -361,6 +363,8 @@ equalValue (VBool a) (VBool b) = VBool $ a == b
 notEqualValue :: Val -> Val -> Val
 notEqualValue (VInt a) (VInt b) = VBool $ a/=b
 notEqualValue (VDouble a) (VDouble b) = VBool $ a/=b
+equalValue (VInt a) (VDouble b) = VBool $ fromIntegral a /= b
+equalValue (VDouble a) (VInt b) = VBool $ a /= fromIntegral b
 notEqualValue (VBool a) (VBool b) = VBool $ a /= b
 
 

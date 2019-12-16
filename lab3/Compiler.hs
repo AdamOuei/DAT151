@@ -13,6 +13,9 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.RWS
 
+import CMM.Abs (Id(..), Type(..), Args(..))
+import TypeChecker (FunType (..))
+
 import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -22,7 +25,7 @@ import Annotated
  -- | Entry point.
 
 data Env = Env {
-  vars :: [Map Ident Int],
+  vars :: [Map Id Int],
   maxvar :: Int,
   code :: [Instruction],
   labelCount :: Int
@@ -64,10 +67,9 @@ compile name _prg = header
     ]
 
 
-compileStm :: Stm -> Compile ()
+compileStm :: Stm -> State Env ()
 compileStm stm = 
           case stm of
-            case stm of 
               SExp exp -> do
                 compileExp exp
                  
@@ -258,7 +260,7 @@ lookupAddr :: Id -> State Env Int
 lookupAddr id = gets $ helper . vars
             where helper (ctx:stack) = fromMaybe (helper stack) (Map.lookup id ctx)
 
--- lookupFun :: FDef -> Type
+lookupFun :: FDef -> Type
 
 -- extendId :: Id -> Type -> Compile ()
 
@@ -267,7 +269,12 @@ lookupAddr id = gets $ helper . vars
 newBlock :: State Env ()
 newBlock = modify (\env -> env{vars = Map.empoty:vars env})
 
--- exitBlock :: Compile ()
+exitBlock ::  State Env ()
+exitBlock = do
+  env <- get 
+  let (ctx:ctxs) = vars env
+  modify (\env -> env{vars = ctxs})
+
 
 emptyEnv ::  Env
 emptyEnv =  Env{

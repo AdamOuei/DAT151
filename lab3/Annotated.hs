@@ -36,7 +36,25 @@ data Exp
     | EInt Integer
     | EDouble Double
     | EId Id
-    | EApp Id [Exp]
+    | ECall Id [Exp]
+    | EInc Id
+    | EDec Id
+    | EInc2 Id
+    | EDec2 Id
+    | EMul Exp Exp
+    | EDiv Exp Exp
+    | EAdd Exp Exp
+    | ESub Exp Exp
+    | ELess Exp Exp
+    | EGre Exp Exp
+    | ELeq Exp Exp
+    | EGeq Exp Exp
+    | EEqua Exp Exp
+    | EIneq Exp Exp
+    | EConj Exp Exp
+    | EDisj Exp Exp
+    | EAss Id Exp
+    | ETyped Exp Type
     deriving (Eq,Ord,Show,Read)
 
 printTree :: Print a => a -> String
@@ -151,7 +169,7 @@ instance Print Exp where
     EInt n                 -> prPrec i 15 (concatD [prt 0 n])
     EDouble d              -> prPrec i 15 (concatD [prt 0 d])
     EId id                 -> prPrec i 15 (concatD [prt 0 id])
-    EApp id exps           -> prPrec i 15 (concatD [prt 0 id, doc (showString "("), prt 0 exps, doc (showString ")")])
+    ECall id exps           -> prPrec i 15 (concatD [prt 0 id, doc (showString "("), prt 0 exps, doc (showString ")")])
     -- ...
     where
     prtType :: Type -> ShowS
