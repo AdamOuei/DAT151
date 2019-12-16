@@ -231,8 +231,12 @@ compile stm =
                       emit $ end ++ ":"
                     EDisj exp1 exp2 -> do
                       compileExp exp1
+                      end <- newLabel "END"
+                      emit "dup"
+                      emit $ "ifne" ++ end
+                      emit "pop"
                       compileExp exp2
-                      emit "ifne"
+                      emit $ end ++ ":"
                     EAss id exp -> do
                       compileExp exp
                       addr <- lookupAddr id
