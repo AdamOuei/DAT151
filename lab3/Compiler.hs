@@ -114,7 +114,7 @@ compileExp :: Stm -> State Env ()
 compile stm = 
           case stm of
                     EInt int -> emit $ "ldc" ++ show i
-                    EDouble doub -> emit $ "ldc" ++ show i
+                    EDouble doub -> emit $ "ldc2_w" ++ show i
                     ETrue -> emit "bipush 1"
                     EFalse -> emit "bipush 0"
                     EId id -> do
@@ -158,31 +158,77 @@ compile stm =
                       do
                         compileExp exp1
                         compileExp exp2
-                        emit "if_icmplt"
+                        true <- newLabel "TRUE"
+                        end <- newLabel "END"
+                        emit $ "if_icmplt" ++ true
+                        emit "bipush 0"
+                        emit $ "goto " ++ end
+                        emit $ true ++ ":"
+                        emit "bipush 1"
+                        emit $ end ++ ":"
                     EGre exp1 exp2 -> do
                       compileExp exp1
                       compileExp exp2
-                      emit "if_icmpgt"
+                      true <- newLabel "TRUE"
+                      end <- newLabel "END"
+                      emit $ "if_icmpgt" ++ true
+                      emit "bipush 0"
+                      emit $ "goto " ++ end
+                      emit $ true ++ ":"
+                      emit "bipush 1"
+                      emit $ end ++ ":"
                     ELeq exp1 exp2 -> do
                       compileExp exp1
                       compileExp exp2
-                      emit "if_icmple"
+                      true <- newLabel "TRUE"
+                      end <- newLabel "END"
+                      emit $ "if_icmple" ++ true
+                      emit "bipush 0"
+                      emit $ "goto " ++ end
+                      emit $ true ++ ":"
+                      emit "bipush 1"
+                      emit $ end ++ ":"
                     EGeq exp1 exp2 -> do
                       compileExp exp1
                       compileExp exp2
-                      emit "if_icmpge"
+                      true <- newLabel "TRUE"
+                      end <- newLabel "END"
+                      emit $ "if_icmpge" ++ true
+                      emit "bipush 0"
+                      emit $ "goto " ++ end
+                      emit $ true ++ ":"
+                      emit "bipush 1"
+                      emit $ end ++ ":"
                     EEqua exp1 exp2 -> do
                       compileExp exp1
                       compileExp exp2
-                      emit "if_icmpeq"
+                      true <- newLabel "TRUE"
+                      end <- newLabel "END"
+                      emit $ "if_icmpeq" ++ true
+                      emit "bipush 0"
+                      emit $ "goto " ++ end
+                      emit $ true ++ ":"
+                      emit "bipush 1"
+                      emit $ end ++ ":"
                     EIneq exp1 exp2 -> do
                       compileExp exp1
                       compileExp exp2
-                      emit "if_icmpne"
+                      true <- newLabel "TRUE"
+                      end <- newLabel "END"
+                      emit $ "if_icmpne" ++ true
+                      emit "bipush 0"
+                      emit $ "goto " ++ end
+                      emit $ true ++ ":"
+                      emit "bipush 1"
+                      emit $ end ++ ":"
                     EConj exp1 exp2 ->do
                       compileExp exp1
+                      end <- newLabel "END"
+                      emit "dup"
+                      emit $ "ifeq" ++ end
+                      emit "pop"
                       compileExp exp2
-                      emit "ifeq"
+                      emit $ end ++ ":"
                     EDisj exp1 exp2 -> do
                       compileExp exp1
                       compileExp exp2
