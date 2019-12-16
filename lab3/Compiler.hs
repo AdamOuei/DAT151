@@ -90,38 +90,49 @@ compileStm stm =
               SDecls typ ids -> mapM_ extendId ids
               SInit typ id exp -> do
                   compileExp exp
-                  addr <- lookupAddr id
+                  addr <- extendId id
                   emit $ "istore " ++ show addr
               SRet typ exp -> do
                   compileExp exp
                   emit "ireturn"
                   -- Newlabel maybe?
               SWhile exp stm' -> do
-                   emit $ "TEST:"
+                   test <- newLabel "TEST"
+                   end <- newLabel "END"
+                   emit $ test ++ ":"
                    compileExp exp
-                   emit $ "ifeq END"
+                   emit $ "ifeq " ++ end
                    newBlock
                    compileStm stm'
                    exitBlock
-                   emit $ "goto TEST"                
-                   emit $ "END:"
+                   emit $ "goto " ++ test               
+                   emit $ end ++ ":"
               SIf exp stm1 stm2 -> do
                   false <- newLabel "FALSE"
                   true <- newLabel "TRUE"
                   compileExp exp
                   newBlock
-                  emit $ "ifeq FALSE"
+                  emit $ "ifeq " ++ false
                   compileStm stm1
-                  emit $ "goto TRUE"
-                  emit $ "FALSE:"
+                  emit $ "goto " ++ true
+                  emit $ false ++ ":"
                   compileStm stm2
-                  emit $ "TRUE:"
+                  emit $ true ++ ":"
                   exitBlock
               SBlock stmxs -> do
                     newBlock
                     mapM_ compileStm stmxs
                     exitBlock
-
+              where
+                  isVoidFunApp :: Exp -> State Env Bool
+                  isVoidFunApp (ECall id _) = isVoidFun id
+                  isVoidFunApp _ = return False
+              
+                  isVoidFun :: Id -> State Env Bool
+                  isVoidFun id = do
+                    jvmFunType <- lookupFun id
+                    return $ last jvmFunType == 'V'
+                  
 
 
 
@@ -294,8 +305,7 @@ getSig id = do
 
 lookupAddr :: Id -> State Env Int
 lookupAddr id = gets $ lookupAddr' . vars
-            where lookupAddr' [ctx] = fromMaybe 0 (Map.lookup id ctx)
-                  lookupAddr' (ctx:stack) = fromMaybe (lookupAddr' stack) (Map.lookup id ctx)
+            where lookupAddr' (ctx:stack) = fromMaybe (lookupAddr' stack) (Map.lookup id ctx)
                   
 
 lookupFun :: Id -> State Env FunString
@@ -307,12 +317,13 @@ lookupFun id = case id of
               id -> gets $ fromJust . Map.lookup id . funs
 
               
-extendId :: Id -> State Env ()
+extendId :: Id -> State Env Int
 extendId id = do
     env <- get
     let (ctx:ctxs) = vars env
     let varPos = maxvar env
     modify (\env -> env{vars = (Map.insert id varPos ctx):ctxs, maxvar = varPos + 1})
+    return varPos
 
 extendFunc :: Env -> Func -> Env
 extendFunc env func@(DFun _ id _ _) = env{funs = Map.insert id (rewriteFunc func) (funs env)} 

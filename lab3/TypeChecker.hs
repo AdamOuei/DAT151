@@ -60,6 +60,15 @@ inferExp env exp = case exp of
                     EId id -> do 
                                 typ <- lookupVar env id
                                 Ok (typ, A.EId id)
+                    ECall id@(Id "printDouble") argExps -> do
+                        (argsTypes,typ) <- lookupFun env id
+                        list <- mapM (\exp -> inferExp env exp) argExps 
+                        let expTypes =  map fst list
+                        let argsExps = map snd list
+                        if (TInt `elem` argsTypes || TDouble `elem` argsTypes) && length argExps == 1 then
+                            return (typ,A.ECall id argsExps)
+                        else
+                            Bad "Function has wrong argument types"
                     ECall id argExps -> do 
                                         (argsTypes,typ) <- lookupFun env id
                                         list <- mapM (\exp -> inferExp env exp) argExps
@@ -245,7 +254,7 @@ checkStm retTyp env stm =
                                     return (env, A.SIf exp' stm1' stm2')
                         SBlock stmxs -> do
                                     let newEnv = newBlock env
-                                    (env, stms') <- checkStms retTyp (newBlock env) stmxs
+                                    (env', stms') <- checkStms retTyp (newBlock env) stmxs
                                     return (env, A.SBlock stms')
 
 -- transformExp :: Exp -> A.Exp
