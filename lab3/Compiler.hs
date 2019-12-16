@@ -25,15 +25,14 @@ import Annotated
  -- | Entry point.
 
 data Env = Env {
-  vars :: [Map Id Int],
+  vars :: [Map Id (Int, Type)],
   maxvar :: Int,
   code :: [Instruction],
   labelCount :: Int,
-  funs :: Map Id FunString,
-  className :: String
-}
+  funs :: Map Id FunString, 
+  className :: String}
 
-data Fun = Fun { funId :: Id, funFunType :: FunType }
+data Fun = Fun { funId :: Id, funFunType :: FunType } 
 
 type Instruction = String 
 type Label = String
@@ -87,14 +86,18 @@ compileStm stm =
                 compileExp exp
                 noPop <- isVoidFunApp exp
                 unless noPop $ emit "pop"
-              SDecls typ ids -> mapM_ extendId ids
+              SDecls typ ids -> mapM_ (extendId typ) ids
               SInit typ id exp -> do
                   compileExp exp
-                  addr <- extendId id
-                  emit $ "istore " ++ show addr
+                  addr <- extendId typ id
+                  case typ of
+                    TDouble -> emit $ "dstore " ++ show addr
+                    _ -> emit $ "istore " ++ show addr
               SRet typ exp -> do
                   compileExp exp
-                  emit "ireturn"
+                  case typ of
+                    TDouble -> emit "dreturn"
+                    _ -> emit "ireturn"
                   -- Newlabel maybe?
               SWhile exp stm' -> do
                    test <- newLabel "TEST"
@@ -145,43 +148,73 @@ compileExp exp =
                     EFalse -> emit "bipush 0 "
                     EId id -> do
                             addr <- lookupAddr id
-                            emit $ "iload " ++ show addr 
+                            case lookupType id of
+                              TDouble -> emit $ "dload " ++ show addr
+                              _ -> emit $ "iload " ++ show addr 
                     ECall id argExps -> do
                       mapM_ compileExp argExps
-                      sig <- getSig id
+                      sig <- getSig id -- Testa ask
                       emit $ "invokestatic " ++ sig
                     EInc id -> do
                        addr <- lookupAddr id
-                       emit $ "iload " ++ show addr
-                       emit $ "iinc " ++ show addr ++ " 1"
+                       case lookupType id of
+                        TDouble -> do 
+                                    emit $ "dload " ++ show addr
+                                    emit $ "dinc " ++ show addr ++ " 1"
+                        _ -> do
+                              emit $ "iload " ++ show addr
+                              emit $ "iinc " ++ show addr ++ " 1"
                     EDec id -> do
                       addr <- lookupAddr id
-                      emit $ "iload " ++ show addr
-                      emit $ "iinc " ++ show addr ++ " -1"
+                      case lookupType id of
+                        TDouble -> do 
+                                    emit $ "dload " ++ show addr
+                                    emit $ "dinc " ++ show addr ++ " 1"
+                        _ -> do
+                              emit $ "iload " ++ show addr
+                              emit $ "iinc " ++ show addr ++ " 1"
                     EInc2 id ->do
                       addr <- lookupAddr id
-                      emit $ "iinc "  ++ show addr ++ " 1"
-                      emit $ "iload " ++ show addr
+                      case lookupType id of
+                        TDouble -> do 
+                                    emit $ "dload " ++ show addr
+                                    emit $ "dinc " ++ show addr ++ " 1"
+                        _ -> do
+                              emit $ "iload " ++ show addr
+                              emit $ "iinc " ++ show addr ++ " 1"
                     EDec2 id ->do
                       addr <- lookupAddr id
-                      emit $ "iinc " ++ show addr ++ " -1"
-                      emit $ "iload " ++ show addr
+                      case lookupType id of
+                        TDouble -> do 
+                                    emit $ "dload " ++ show addr
+                                    emit $ "dinc " ++ show addr ++ " 1"
+                        _ -> do
+                              emit $ "iload " ++ show addr
+                              emit $ "iinc " ++ show addr ++ " 1"
                     EMul exp1 exp2 -> do
                         compileExp exp1
                         compileExp exp2
-                        emit "imul"
+                        case lookupType id of
+                          TDouble -> emit "dmul "
+                          _ -> emit "imul "
                     EDiv exp1 exp2 ->  do
                       compileExp exp1
                       compileExp exp2
-                      emit "idiv "
+                      case lookupType id of
+                        TDouble -> emit "dmul "
+                        _ -> emit "idiv "
                     EAdd exp1 exp2 ->  do
                       compileExp exp1
                       compileExp exp2
-                      emit "iadd "
+                      case lookupType id of
+                        TDouble -> emit "dadd "
+                        _ -> emit "iadd "
                     ESub exp1 exp2 ->  do
                       compileExp exp1
                       compileExp exp2
-                      emit "isub "
+                      case lookupType id of 
+                        TDouble -> emit "dsub "
+                        _ -> emit "isub "
                     ELess exp1 exp2 ->
                       do
                         compileExp exp1
@@ -269,7 +302,9 @@ compileExp exp =
                       compileExp exp
                       addr <- lookupAddr id
                       emit "dup "
-                      emit $ "istore " ++ show addr
+                      case lookupType id of
+                        TDouble -> emit $ "dstore " ++ show addr
+                        _ -> emit $ "istore " ++ show addr
 
 
 compileFun :: Func -> State Env ()
@@ -278,7 +313,7 @@ compileFun (DFun typ id args body) = do
             emit $ ".method public static " ++ funString
             emit ".limit locals 1000"
             emit ".limit stack 1000"
-            mapM_  (\(FArgs _ id) -> extendId id) args 
+            mapM_  (\(FArgs typ id) -> extendId typ id) args 
             mapM_ compileStm body
             when (typ == TVoid) $ emit "return"
             emit' ".end method"
@@ -290,7 +325,7 @@ emit i = emit' $ " " ++ i
 emit' :: String -> State Env ()
 emit' str = modify (\env -> env{code = str : code env})
 
-
+-- Kan vara denna som är seg som fan
 getSig :: Id -> State Env FunString
 getSig id = do
         env <- get
@@ -305,7 +340,7 @@ getSig id = do
 
 lookupAddr :: Id -> State Env Int
 lookupAddr id = gets $ lookupAddr' . vars
-            where lookupAddr' (ctx:stack) = fromMaybe (lookupAddr' stack) (Map.lookup id ctx)
+            where lookupAddr' (ctx:stack) = fst $ fromMaybe (lookupAddr' stack) (Map.lookup id (ctx))
                   
 
 lookupFun :: Id -> State Env FunString
@@ -316,17 +351,19 @@ lookupFun id = case id of
               (Id "readDouble") -> return "readDouble()D"
               id -> gets $ fromJust . Map.lookup id . funs
 
+lookupType :: Id -> Type
+lookupType id = gets $ snd . fromJust . Map.lookup id . vars
               
-extendId :: Id -> State Env Int
-extendId id = do
+extendId :: Type -> Id -> State Env Int
+extendId typ id = do
     env <- get
     let (ctx:ctxs) = vars env
     let varPos = maxvar env
-    modify (\env -> env{vars = (Map.insert id varPos ctx):ctxs, maxvar = varPos + 1})
+    modify (\env -> env{vars = (Map.insert id (varPos, typ) ctx):ctxs, maxvar = varPos + 1})
     return varPos
 
 extendFunc :: Env -> Func -> Env
-extendFunc env func@(DFun _ id _ _) = env{funs = Map.insert id (rewriteFunc func) (funs env)} 
+extendFunc env func@(DFun typ id _ _) = env{funs = Map.insert id (rewriteFunc func) (funs env)} 
 
 rewriteFunc :: Func -> FunString
 rewriteFunc func@(DFun typ (Id name) args body) = 
