@@ -30,7 +30,8 @@ data Env = Env {
   code :: [Instruction],
   labelCount :: Int,
   funs :: Map Id FunString, 
-  className :: String}
+  className :: String
+  }
 
 data Fun = Fun { funId :: Id, funFunType :: FunType } 
 
@@ -201,7 +202,7 @@ compileExp exp =
                       compileExp exp1
                       compileExp exp2
                       case lookupType id of
-                        TDouble -> emit "dmul "
+                        TDouble -> emit "ddiv "
                         _ -> emit "idiv "
                     EAdd exp1 exp2 ->  do
                       compileExp exp1
@@ -340,7 +341,7 @@ getSig id = do
 
 lookupAddr :: Id -> State Env Int
 lookupAddr id = gets $ lookupAddr' . vars
-            where lookupAddr' (ctx:stack) = fst $ fromMaybe (lookupAddr' stack) (Map.lookup id (ctx))
+            where lookupAddr' (ctx:stack) = fst $ fromMaybe (lookupAddr' stack) (Map.lookup id ctx)
                   
 
 lookupFun :: Id -> State Env FunString
