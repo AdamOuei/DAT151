@@ -33,7 +33,6 @@ data Env = Env {
   className :: String
 }
 
-data Fun = Fun { funId :: Id, funFunType :: FunType }
 
 type Instruction = String 
 type Label = String
@@ -84,23 +83,31 @@ compileStm :: Stm -> State Env ()
 compileStm stm = 
           case stm of
               SExp typ exp -> do
-                compileExp exp
+                compileExp typ exp
                 noPop <- isVoidFunApp exp
-                unless noPop $ emit "pop"
+                let pop_string = if typ == TDouble
+                                then "pop2"
+                                else "pop"
+                unless noPop $ emit pop_string
               SDecls typ ids -> mapM_ extendId ids
               SInit typ id exp -> do
-                  compileExp exp
+                  compileExp typ exp
                   addr <- extendId id
-                  emit $ "istore " ++ show addr
+                  case typ of
+                   TDouble -> emit $ "dstore " ++ show addr
+                   _ -> emit $ "istore " ++ show addr
               SRet typ exp -> do
-                  compileExp exp
-                  emit "ireturn"
-                  -- Newlabel maybe?
+                  compileExp typ exp
+                  case typ of
+                    TDouble -> emit "dreturn"
+                    TVoid -> return ()
+                    _ -> emit "ireturn"
+
               SWhile exp stm' -> do
                    test <- newLabel "TEST"
                    end <- newLabel "END"
                    emit $ test ++ ":"
-                   compileExp exp
+                   compileExp' exp
                    emit $ "ifeq " ++ end
                    newBlock
                    compileStm stm'
@@ -110,8 +117,8 @@ compileStm stm =
               SIf exp stm1 stm2 -> do
                   false <- newLabel "FALSE"
                   true <- newLabel "TRUE"
-                  compileExp exp
-                  newBlock
+                  compileExp' exp
+                  newBlock                   
                   emit $ "ifeq " ++ false
                   compileStm stm1
                   emit $ "goto " ++ true
@@ -124,20 +131,25 @@ compileStm stm =
                     mapM_ compileStm stmxs
                     exitBlock
               where
+
+                   
                   isVoidFunApp :: Exp -> State Env Bool
-                  isVoidFunApp (ECall id _) = isVoidFun id
+                  isVoidFunApp (ETyped (ECall id _) _) = isVoidFun id
                   isVoidFunApp _ = return False
               
                   isVoidFun :: Id -> State Env Bool
                   isVoidFun id = do
-                    jvmFunType <- lookupFun id
-                    return $ last jvmFunType == 'V'
-                  
+                    funString <- lookupFun id
+                    return $ last funString == 'V'
 
 
+compileExp :: Type -> Exp -> State Env ()
+compileExp TDouble exp@(ETyped exp' TInt) = compileExp' exp >> emit "i2d "
+compileExp _ exp = compileExp' exp
 
-compileExp :: Exp -> State Env ()
-compileExp exp = 
+
+compileExp' :: Exp -> State Env ()
+compileExp' (ETyped exp typ) = 
           case exp of
                     EInt int -> emit $ "ldc " ++ show int
                     EDouble doub -> emit $ "ldc2_w " ++ show doub
@@ -145,131 +157,163 @@ compileExp exp =
                     EFalse -> emit "bipush 0 "
                     EId id -> do
                             addr <- lookupAddr id
-                            emit $ "iload " ++ show addr 
+                            let load_string = if typ == TDouble
+                                              then "dload "
+                                              else "iload "
+                            emit $ load_string ++ show addr 
                     ECall id argExps -> do
-                      mapM_ compileExp argExps
+                      mapM_ compileExp' argExps
                       sig <- getSig id
                       emit $ "invokestatic " ++ sig
                     EInc id -> do
                        addr <- lookupAddr id
-                       emit $ "iload " ++ show addr
+                       case typ of
+                        TDouble -> emit $ "dload " ++ show addr
+                        _ -> emit $ "iload " ++ show addr
                        emit $ "iinc " ++ show addr ++ " 1"
                     EDec id -> do
                       addr <- lookupAddr id
-                      emit $ "iload " ++ show addr
+                      case typ of
+                        TDouble -> emit $ "dload " ++ show addr
+                        _ -> emit $ "iload " ++ show addr
                       emit $ "iinc " ++ show addr ++ " -1"
                     EInc2 id ->do
                       addr <- lookupAddr id
                       emit $ "iinc "  ++ show addr ++ " 1"
-                      emit $ "iload " ++ show addr
+                      case typ of
+                        TDouble -> emit $ "dload " ++ show addr
+                        _ -> emit $ "iload " ++ show addr
                     EDec2 id ->do
                       addr <- lookupAddr id
                       emit $ "iinc " ++ show addr ++ " -1"
-                      emit $ "iload " ++ show addr
+                      case typ of
+                        TDouble -> emit $ "dload " ++ show addr
+                        _ -> emit $ "iload " ++ show addr
                     EMul exp1 exp2 -> do
-                        compileExp exp1
-                        compileExp exp2
-                        emit "imul"
-                    EDiv exp1 exp2 ->  do
-                      compileExp exp1
-                      compileExp exp2
-                      emit "idiv "
-                    EAdd exp1 exp2 ->  do
-                      compileExp exp1
-                      compileExp exp2
-                      emit "iadd "
-                    ESub exp1 exp2 ->  do
-                      compileExp exp1
-                      compileExp exp2
-                      emit "isub "
-                    ELess exp1 exp2 ->
-                      do
-                        compileExp exp1
-                        compileExp exp2
-                        true <- newLabel "TRUE"
-                        end <- newLabel "END"
-                        emit $ "if_icmplt " ++ true
-                        emit "bipush 0 "
-                        emit $ "goto " ++ end
-                        emit $ true ++ ":"
-                        emit "bipush 1"
-                        emit $ end ++ ":"
+                      let t = inferBin exp1 exp2 
+                      compileExp t exp1
+                      compileExp t exp2
+                      case t of
+                        TDouble -> emit "dmul "
+                        TInt -> emit "imul "
+                    EDiv  exp1 exp2 ->  do
+                      let t = inferBin exp1 exp2 
+                      compileExp t exp1
+                      compileExp t exp2
+                      case t of
+                        TDouble -> emit "ddiv "
+                        TInt -> emit "idiv "
+                    EAdd  exp1 exp2 ->  do
+                      let t = inferBin exp1 exp2 
+                      compileExp t exp1
+                      compileExp t exp2
+                      case t of
+                        TDouble -> emit "dadd "
+                        TInt -> emit "iadd "
+                    ESub  exp1 exp2 ->  do
+                      let t = inferBin exp1 exp2
+                      compileExp t exp1
+                      compileExp t exp2
+                      case t of
+                        TDouble -> emit "dsub"
+                        TInt -> emit "isub"
+                    ELess exp1 exp2 -> do
+                      let t = inferBin exp1 exp2
+                      case t of
+                        TDouble -> doubleCompare t exp1 exp2 "ifge "
+                        _ -> integerCompare t exp1 exp2 "if_icmplt "
                     EGre exp1 exp2 -> do
-                      compileExp exp1
-                      compileExp exp2
-                      true <- newLabel "TRUE"
-                      end <- newLabel "END"
-                      emit $ "if_icmpgt " ++ true
-                      emit "bipush 0"
-                      emit $ "goto " ++ end
-                      emit $ true ++ ":"
-                      emit "bipush 1"
-                      emit $ end ++ ":"
+                      let t = inferBin exp1 exp2
+                      case t of 
+                        TDouble -> doubleCompare t exp1 exp2 "ifle "
+                        _ -> integerCompare t exp1 exp2 "if_icmpgt "
                     ELeq exp1 exp2 -> do
-                      compileExp exp1
-                      compileExp exp2
-                      true <- newLabel "TRUE"
-                      end <- newLabel "END"
-                      emit $ "if_icmple " ++ true
-                      emit "bipush 0"
-                      emit $ "goto " ++ end
-                      emit $ true ++ ":"
-                      emit "bipush 1"
-                      emit $ end ++ ":"
+                      let t = inferBin exp1 exp2
+                      case t of 
+                        TDouble -> doubleCompare t exp1 exp2 "ifgt "
+                        _ ->  integerCompare t exp1 exp2 "if_icmple "
                     EGeq exp1 exp2 -> do
-                      compileExp exp1
-                      compileExp exp2
-                      true <- newLabel "TRUE"
-                      end <- newLabel "END"
-                      emit $ "if_icmpge " ++ true
-                      emit "bipush 0"
-                      emit $ "goto " ++ end
-                      emit $ true ++ ":"
-                      emit "bipush 1"
-                      emit $ end ++ ":"
+                      let t = inferBin exp1 exp2
+                      case t of 
+                        TDouble -> doubleCompare t exp1 exp2 "iflt "
+                        _ -> integerCompare t exp1 exp2 "if_icmpge "
                     EEqua exp1 exp2 -> do
-                      compileExp exp1
-                      compileExp exp2
-                      true <- newLabel "TRUE"
-                      end <- newLabel "END"
-                      emit $ "if_icmpeq " ++ true
-                      emit "bipush 0"
-                      emit $ "goto " ++ end
-                      emit $ true ++ ":"
-                      emit "bipush 1"
-                      emit $ end ++ ":"
+                      let t = inferBin' exp1 exp2
+                      case t of
+                        TDouble -> doubleCompare t exp1 exp2 "ifne "
+                        _ -> integerCompare t exp1 exp2 "if_icmpeq "
                     EIneq exp1 exp2 -> do
-                      compileExp exp1
-                      compileExp exp2
-                      true <- newLabel "TRUE"
-                      end <- newLabel "END"
-                      emit $ "if_icmpne " ++ true
-                      emit "bipush 0"
-                      emit $ "goto " ++ end
-                      emit $ true ++ ":"
-                      emit "bipush 1"
-                      emit $ end ++ ":"
-                    EConj exp1 exp2 ->do
-                      compileExp exp1
+                      let t = inferBin' exp1 exp2
+                      case t of
+                        TDouble -> doubleCompare t exp1 exp2 "ifeq "
+                        _ -> integerCompare t exp1 exp2 "if_icmpne "
+                    EConj exp1 exp2 -> do
+                      compileExp' exp1
                       end <- newLabel "END"
                       emit "dup "
                       emit $ "ifeq " ++ end
                       emit "pop "
-                      compileExp exp2
+                      compileExp' exp2
                       emit $ end ++ ":"
                     EDisj exp1 exp2 -> do
-                      compileExp exp1
+                      compileExp' exp1
                       end <- newLabel "END"
                       emit "dup "
                       emit $ "ifne " ++ end
                       emit "pop "
-                      compileExp exp2
+                      compileExp' exp2
                       emit $ end ++ ":"
                     EAss id exp -> do
-                      compileExp exp
+                      compileExp typ exp
                       addr <- lookupAddr id
-                      emit "dup "
-                      emit $ "istore " ++ show addr
+                      case typ of
+                        TDouble ->do
+                           emit "dup2 "
+                           emit $ "dstore " ++ show addr
+                        _ -> do
+                          emit "dup "
+                          emit $ "istore " ++ show addr
+            where 
+                          integerCompare :: Type -> Exp -> Exp -> String -> State Env ()
+                          integerCompare t exp1 exp2 op =
+                            do
+                              compileExp t exp1
+                              compileExp t exp2
+                              true <- newLabel "TRUE"
+                              end <- newLabel "END"
+                              emit $ op ++ true
+                              emit "bipush 0 "
+                              emit $ "goto " ++ end
+                              emit $ true ++ ":"
+                              emit "bipush 1"
+                              emit $ end ++ ":"
+                          doubleCompare :: Type -> Exp -> Exp -> String -> State Env ()
+                          doubleCompare t exp1 exp2 op = do 
+                              compileExp t exp1
+                              compileExp t exp2
+                              true <- newLabel "TRUE"
+                              end <- newLabel "END"
+                              emit "dcmpl "
+                              emit $ op ++ end
+                              emit $ true ++ ":"
+                              emit $ end ++ ":"
+
+                            
+
+                            
+
+                      
+inferBin :: Exp -> Exp -> Type
+inferBin (ETyped _ typ1) (ETyped _ typ2) = 
+                    case typ1 of
+                      TDouble -> TDouble
+                      TInt -> case typ2 of
+                        TDouble -> TDouble
+                        TInt -> TInt   
+
+inferBin' :: Exp -> Exp -> Type
+inferBin' (ETyped _ TBool) (ETyped _ TBool) = TBool
+inferBin' exp1 exp2 = inferBin exp1 exp2
 
 
 compileFun :: Func -> State Env ()

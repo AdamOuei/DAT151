@@ -154,7 +154,7 @@ instance Print Args where
 
 instance Print Stm where
   prt i = \case
-    SExp type_ exp -> prPrec i 0 (concatD [parenth (prt 0 type_), prt 0 exp, doc (showString ";")])
+    SExp typ exp -> prPrec i 0 (concatD [parenth (prt 0 typ),prt 0 exp, doc (showString ";")])
     SInit type_ id exp -> prPrec i 0 (concatD [prt 0 type_, prt 0 id, doc (showString "="), prt 0 exp, doc (showString ";")])
     SWhile exp stm -> prPrec i 0 (concatD [doc (showString "while"), doc (showString "("), prt 0 exp, doc (showString ")"), prt 0 stm])
     -- ...
