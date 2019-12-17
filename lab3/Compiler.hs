@@ -159,8 +159,8 @@ compileExp exp =
                        addr <- lookupAddr id
                        case lookupType id of
                         TDouble -> do 
-                                    emit $ "dload " ++ show addr
-                                    emit $ "dinc " ++ show addr ++ " 1"
+                              emit $ "dload " ++ show addr
+                              emit $ "dinc " ++ show addr ++ " 1"
                         _ -> do
                               emit $ "iload " ++ show addr
                               emit $ "iinc " ++ show addr ++ " 1"
@@ -168,8 +168,8 @@ compileExp exp =
                       addr <- lookupAddr id
                       case lookupType id of
                         TDouble -> do 
-                                    emit $ "dload " ++ show addr
-                                    emit $ "dinc " ++ show addr ++ " 1"
+                              emit $ "dload " ++ show addr
+                              emit $ "dinc " ++ show addr ++ " 1"
                         _ -> do
                               emit $ "iload " ++ show addr
                               emit $ "iinc " ++ show addr ++ " 1"
@@ -177,8 +177,8 @@ compileExp exp =
                       addr <- lookupAddr id
                       case lookupType id of
                         TDouble -> do 
-                                    emit $ "dload " ++ show addr
-                                    emit $ "dinc " ++ show addr ++ " 1"
+                              emit $ "dload " ++ show addr
+                              emit $ "dinc " ++ show addr ++ " 1"
                         _ -> do
                               emit $ "iload " ++ show addr
                               emit $ "iinc " ++ show addr ++ " 1"
@@ -186,33 +186,33 @@ compileExp exp =
                       addr <- lookupAddr id
                       case lookupType id of
                         TDouble -> do 
-                                    emit $ "dload " ++ show addr
-                                    emit $ "dinc " ++ show addr ++ " 1"
+                              emit $ "dload " ++ show addr
+                              emit $ "dinc " ++ show addr ++ " 1"
                         _ -> do
                               emit $ "iload " ++ show addr
                               emit $ "iinc " ++ show addr ++ " 1"
                     EMul exp1 exp2 -> do
-                        compileExp exp1
-                        compileExp exp2
-                        case lookupType id of
-                          TDouble -> emit "dmul "
-                          _ -> emit "imul "
+                      compileExp exp1
+                      compileExp exp2
+                      case getType (EMul exp1 exp2) of
+                        TDouble -> emit "dmul "
+                        _ -> emit "imul "
                     EDiv exp1 exp2 ->  do
                       compileExp exp1
                       compileExp exp2
-                      case lookupType id of
-                        TDouble -> emit "dmul "
+                      case getType (EDiv exp1 exp2) of
+                        TDouble -> emit "ddiv "
                         _ -> emit "idiv "
                     EAdd exp1 exp2 ->  do
                       compileExp exp1
                       compileExp exp2
-                      case lookupType id of
+                      case getType (EAdd exp1 exp2) of
                         TDouble -> emit "dadd "
                         _ -> emit "iadd "
                     ESub exp1 exp2 ->  do
                       compileExp exp1
                       compileExp exp2
-                      case lookupType id of 
+                      case getType (ESub exp1 exp2) of 
                         TDouble -> emit "dsub "
                         _ -> emit "isub "
                     ELess exp1 exp2 ->
@@ -406,3 +406,37 @@ newLabel labelName = do
     modify (\env -> env {labelCount = 1 + labelCount env})
     return $ labelName ++ show (labelCount env)
 
+getType :: Exp -> Type
+getType exp = case exp of
+  -- EInt int -> TInt
+  -- EDouble doub -> TDouble
+  -- ETrue -> TBool
+  -- EFalse -> TBool
+  -- EId id -> lookupType id
+  -- ECall id exps -> 
+  -- EInc id -> lookupType id
+  -- EDec id -> lookupType id
+  -- EInc2 id -> lookupType id
+  -- EDec2 id -> lookupType id
+  EMul exp1 exp2 -> inferBin exp1 exp2
+  EDiv exp1 exp2 -> inferBin exp1 exp2
+  EAdd exp1 exp2 -> inferBin exp1 exp2
+  ESub exp1 exp2 -> inferBin exp1 exp2
+  -- ELess exp1 exp2 -> TBool
+  -- EGre exp1 exp2 -> TBool
+  -- ELeq exp1 exp2 -> TBool
+  -- EGeq exp1 exp2 -> TBool
+  -- EEqua exp1 exp2 -> TBool
+  -- EIneq exp1 exp2 -> TBool
+  -- EConj exp1 exp2 -> TBool
+  -- EDisj exp1 exp2 -> TBool
+  -- EAss id exp -> lookupType id
+
+inferBin :: Exp -> Exp -> Type
+inferBin exp1 exp2 = case getType exp1 of
+                            (TInt,_) -> case getType exp2 of
+                                (TInt,_) -> TInt
+                                (TDouble,_) -> TDouble
+                            (TDouble, _) -> case getType exp2 of
+                                (TInt, _) -> TDouble
+                                (TDouble,_) -> TDouble
