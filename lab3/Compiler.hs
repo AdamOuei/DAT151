@@ -97,7 +97,6 @@ compileStm stm =
                    _ -> emit $ "istore " ++ show addr
               SRet typ exp -> do
                   compileExp typ exp
-                  emit $ "this is shit " ++ show exp
                   case typ of
                     TDouble -> emit "dreturn"
                     TVoid -> return ()
@@ -205,34 +204,10 @@ compileExp' (ETyped exp typ) =
                         _ ->do
                           emit $ "iinc " ++ show addr ++ " -1" 
                           emit $ "iload " ++ show addr
-                    EMul exp1 exp2 -> do
-                      let t = inferBin exp1 exp2 
-                      compileExp t exp1
-                      compileExp t exp2
-                      case t of
-                        TDouble -> emit "dmul "
-                        TInt -> emit "imul "
-                    EDiv  exp1 exp2 ->  do
-                      let t = inferBin exp1 exp2 
-                      compileExp t exp1
-                      compileExp t exp2
-                      case t of
-                        TDouble -> emit "ddiv "
-                        TInt -> emit "idiv "
-                    EAdd  exp1 exp2 ->  do
-                      let t = inferBin exp1 exp2 
-                      compileExp t exp1
-                      compileExp t exp2
-                      case t of
-                        TDouble -> emit "dadd "
-                        TInt -> emit "iadd "
-                    ESub  exp1 exp2 ->  do
-                      let t = inferBin exp1 exp2
-                      compileExp t exp1
-                      compileExp t exp2
-                      case t of
-                        TDouble -> emit "dsub"
-                        TInt -> emit "isub"
+                    EMul exp1 exp2 -> arethOp exp1 exp2 "mul"
+                    EDiv  exp1 exp2 ->  arethOp exp1 exp2 "div"
+                    EAdd  exp1 exp2 ->  arethOp exp1 exp2 "add"  
+                    ESub  exp1 exp2 ->  arethOp exp1 exp2 "sub"
                     ELess exp1 exp2 -> do
                       let t = inferBin exp1 exp2
                       case t of
@@ -316,7 +291,14 @@ compileExp' (ETyped exp typ) =
                             emit $ true ++ ":"
                             emit "bipush 1"
                             emit $ end ++ ":"
-                              
+                          arethOp :: Exp -> Exp -> String -> State Env ()
+                          arethOp exp1 exp2 op = do
+                            let typ = inferBin exp1 exp2 
+                            compileExp typ exp1
+                            compileExp typ exp2
+                            case typ of 
+                              TDouble -> emit $ "d" ++ op
+                              TInt -> emit $ "i" ++ op
 
                             
 
