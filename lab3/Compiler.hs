@@ -147,11 +147,13 @@ compileExp' (ETyped exp typ) =
                                               then "dload "
                                               else "iload "
                             emit $ load_string ++ show addr 
+
+                    ECall id@(Id "printDouble") argExps -> do
+                      mapM_ (compileExp TDouble) argExps
+                      sig <- getSig id
+                      emit $ "invokestatic " ++ sig  
                     ECall id argExps -> do
-                      fun <- lookupFun id
-                      if fun == "printDouble(D)V" then
-                        mapM_ (compileExp TDouble) argExps
-                        else mapM_ compileExp' argExps
+                      mapM_ compileExp' argExps
                       sig <- getSig id
                       emit $ "invokestatic " ++ sig
                     EInc id -> do
