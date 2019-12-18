@@ -84,25 +84,24 @@ compileStm stm =
           case stm of
               SExp typ exp -> do
                 compileExp typ exp
-                noPop <- isVoidFunApp exp
-                let pop_string = if typ == TDouble
-                                then "pop2"
-                                else "pop"
-                unless noPop $ emit pop_string
-              SDecls typ ids -> mapM_ extendId ids
+                case typ of
+                  TDouble -> emit "pop2"
+                  TVoid -> return ()
+                  _ -> emit "pop"
+              SDecls typ ids -> mapM_ (extendId typ) ids
               SInit typ id exp -> do
                   compileExp typ exp
-                  addr <- extendId id
+                  addr <- extendId typ id
                   case typ of
                    TDouble -> emit $ "dstore " ++ show addr
                    _ -> emit $ "istore " ++ show addr
               SRet typ exp -> do
                   compileExp typ exp
+                  emit $ "this is shit " ++ show exp
                   case typ of
                     TDouble -> emit "dreturn"
                     TVoid -> return ()
                     _ -> emit "ireturn"
-
               SWhile exp stm' -> do
                    test <- newLabel "TEST"
                    end <- newLabel "END"
@@ -130,18 +129,6 @@ compileStm stm =
                     newBlock
                     mapM_ compileStm stmxs
                     exitBlock
-              where
-
-                   
-                  isVoidFunApp :: Exp -> State Env Bool
-                  isVoidFunApp (ETyped (ECall id _) _) = isVoidFun id
-                  isVoidFunApp _ = return False
-              
-                  isVoidFun :: Id -> State Env Bool
-                  isVoidFun id = do
-                    funString <- lookupFun id
-                    return $ last funString == 'V'
-
 
 compileExp :: Type -> Exp -> State Env ()
 compileExp TDouble exp@(ETyped exp' TInt) = compileExp' exp >> emit "i2d "
@@ -162,33 +149,62 @@ compileExp' (ETyped exp typ) =
                                               else "iload "
                             emit $ load_string ++ show addr 
                     ECall id argExps -> do
-                      mapM_ compileExp' argExps
+                      fun <- lookupFun id
+                      if fun == "printDouble(D)V" then
+                        mapM_ (compileExp TDouble) argExps
+                        else mapM_ compileExp' argExps
                       sig <- getSig id
                       emit $ "invokestatic " ++ sig
                     EInc id -> do
                        addr <- lookupAddr id
                        case typ of
-                        TDouble -> emit $ "dload " ++ show addr
-                        _ -> emit $ "iload " ++ show addr
-                       emit $ "iinc " ++ show addr ++ " 1"
+                        TDouble -> do  
+                                  emit $ "dload " ++ show addr
+                                  emit $ "dup2"
+                                  emit $ "dconst_1"
+                                  emit $ "dadd"
+                                  emit $ "dstore " ++ show addr
+
+                        _ ->do emit $ "iload " ++ show addr
+                               emit $ "iinc " ++ show addr ++ " 1"
                     EDec id -> do
                       addr <- lookupAddr id
                       case typ of
-                        TDouble -> emit $ "dload " ++ show addr
-                        _ -> emit $ "iload " ++ show addr
-                      emit $ "iinc " ++ show addr ++ " -1"
+                        TDouble ->do 
+                                  emit $ "dload " ++ show addr
+                                  emit $ "dup2"
+                                  emit $ "dconst_1"
+                                  emit $ "dsub"
+                                  emit $ "dstore " ++ show addr
+                        _ -> do 
+                             emit $ "iload " ++ show addr
+                             emit $ "iinc " ++ show addr ++ " -1"
                     EInc2 id ->do
                       addr <- lookupAddr id
-                      emit $ "iinc "  ++ show addr ++ " 1"
+                      
                       case typ of
-                        TDouble -> emit $ "dload " ++ show addr
-                        _ -> emit $ "iload " ++ show addr
+                        TDouble ->do 
+                          emit $ "dload "  ++ show addr
+                          emit "dconst_1"
+                          emit "dadd"
+                          emit "dup2"
+                          emit $ "dstore " ++ show addr
+                        _ ->do 
+                            emit $ "iinc "  ++ show addr ++ " 1"
+                            emit $ "iload " ++ show addr
                     EDec2 id ->do
                       addr <- lookupAddr id
-                      emit $ "iinc " ++ show addr ++ " -1"
+                      
                       case typ of
-                        TDouble -> emit $ "dload " ++ show addr
-                        _ -> emit $ "iload " ++ show addr
+                        TDouble ->do
+                          emit $ "dload "  ++ show addr
+                          emit "dconst_1"
+                          emit "dsub"
+                          emit "dup2"
+                          emit $ "dstore " ++ show addr
+                        _ ->do
+                          emit $ "iinc " ++ show addr ++ " -1" 
+                          emit $ "iload " ++ show addr
                     EMul exp1 exp2 -> do
                       let t = inferBin exp1 exp2 
                       compileExp t exp1
@@ -220,32 +236,32 @@ compileExp' (ETyped exp typ) =
                     ELess exp1 exp2 -> do
                       let t = inferBin exp1 exp2
                       case t of
-                        TDouble -> doubleCompare t exp1 exp2 "ifge "
+                        TDouble -> doubleCompare t exp1 exp2 "iflt "
                         _ -> integerCompare t exp1 exp2 "if_icmplt "
                     EGre exp1 exp2 -> do
                       let t = inferBin exp1 exp2
                       case t of 
-                        TDouble -> doubleCompare t exp1 exp2 "ifle "
+                        TDouble -> doubleCompare t exp1 exp2 "ifgt "
                         _ -> integerCompare t exp1 exp2 "if_icmpgt "
                     ELeq exp1 exp2 -> do
                       let t = inferBin exp1 exp2
                       case t of 
-                        TDouble -> doubleCompare t exp1 exp2 "ifgt "
+                        TDouble -> doubleCompare t exp1 exp2 "ifle "
                         _ ->  integerCompare t exp1 exp2 "if_icmple "
                     EGeq exp1 exp2 -> do
                       let t = inferBin exp1 exp2
                       case t of 
-                        TDouble -> doubleCompare t exp1 exp2 "iflt "
+                        TDouble -> doubleCompare t exp1 exp2 "ifge "
                         _ -> integerCompare t exp1 exp2 "if_icmpge "
                     EEqua exp1 exp2 -> do
                       let t = inferBin' exp1 exp2
                       case t of
-                        TDouble -> doubleCompare t exp1 exp2 "ifne "
+                        TDouble -> doubleCompare t exp1 exp2 "ifeq "
                         _ -> integerCompare t exp1 exp2 "if_icmpeq "
                     EIneq exp1 exp2 -> do
                       let t = inferBin' exp1 exp2
                       case t of
-                        TDouble -> doubleCompare t exp1 exp2 "ifeq "
+                        TDouble -> doubleCompare t exp1 exp2 "ifne "
                         _ -> integerCompare t exp1 exp2 "if_icmpne "
                     EConj exp1 exp2 -> do
                       compileExp' exp1
@@ -268,10 +284,10 @@ compileExp' (ETyped exp typ) =
                       addr <- lookupAddr id
                       case typ of
                         TDouble ->do
-                           emit "dup2 "
+                           emit "dup2"
                            emit $ "dstore " ++ show addr
                         _ -> do
-                          emit "dup "
+                          emit "dup"
                           emit $ "istore " ++ show addr
             where 
                           integerCompare :: Type -> Exp -> Exp -> String -> State Env ()
@@ -289,14 +305,18 @@ compileExp' (ETyped exp typ) =
                               emit $ end ++ ":"
                           doubleCompare :: Type -> Exp -> Exp -> String -> State Env ()
                           doubleCompare t exp1 exp2 op = do 
-                              compileExp t exp1
-                              compileExp t exp2
-                              true <- newLabel "TRUE"
-                              end <- newLabel "END"
-                              emit "dcmpl "
-                              emit $ op ++ end
-                              emit $ true ++ ":"
-                              emit $ end ++ ":"
+                            compileExp t exp1
+                            compileExp t exp2
+                            true <- newLabel "TRUE"
+                            end <- newLabel "END"
+                            emit "dcmpl "
+                            emit $ op ++ true
+                            emit "bipush 0"
+                            emit $ "goto " ++ end
+                            emit $ true ++ ":"
+                            emit "bipush 1"
+                            emit $ end ++ ":"
+                              
 
                             
 
@@ -322,9 +342,10 @@ compileFun (DFun typ id args body) = do
             emit $ ".method public static " ++ funString
             emit ".limit locals 1000"
             emit ".limit stack 1000"
-            mapM_  (\(FArgs _ id) -> extendId id) args 
+            mapM_  (\(FArgs typ id) -> extendId typ id) args 
             mapM_ compileStm body
             when (typ == TVoid) $ emit "return"
+            emit "ireturn"
             emit' ".end method"
             emit ""
 
@@ -361,12 +382,12 @@ lookupFun id = case id of
               id -> gets $ fromJust . Map.lookup id . funs
 
               
-extendId :: Id -> State Env Int
-extendId id = do
+extendId :: Type -> Id -> State Env Int
+extendId typ id = do
     env <- get
     let (ctx:ctxs) = vars env
     let varPos = maxvar env
-    modify (\env -> env{vars = (Map.insert id varPos ctx):ctxs, maxvar = varPos + 1})
+    modify (\env -> env{vars = (Map.insert id varPos ctx):ctxs, maxvar = if typ == TDouble then  varPos + 2 else  varPos + 1})
     return varPos
 
 extendFunc :: Env -> Func -> Env
