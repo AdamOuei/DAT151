@@ -103,42 +103,46 @@ inferExp env exp = case exp of
                             else
                                 Bad $ "Id " ++ printTree id ++ " has wrong type"
                     EMul exp1 exp2 -> do
-                                        typ <- inferBin env exp1 exp2
-                                        (_, exp1') <- inferExp env exp1
-                                        (_, exp2') <- inferExp env exp2
-                                        Ok (typ, A.ETyped (A.EMul exp1' exp2') typ)
+                        --typ <- inferBin env exp1 exp2
+                        (typ1, exp1') <- inferExp env exp1
+                        (typ2, exp2') <- inferExp env exp2
+                        typ <- inferBin typ1 typ2
+                        Ok (typ, A.ETyped (A.EMul exp1' exp2') typ)
                     EDiv exp1 exp2 -> do
-                        typ <- inferBin env exp1 exp2
-                        (_, exp1') <- inferExp env exp1
-                        (_, exp2') <- inferExp env exp2
+                        --typ <- inferBin env exp1 exp2
+                        (typ1, exp1') <- inferExp env exp1
+                        (typ2, exp2') <- inferExp env exp2
+                        typ <- inferBin typ1 typ2
                         Ok (typ, A.ETyped (A.EDiv exp1' exp2') typ)
                     EAdd exp1 exp2 -> do
-                        typ <- inferBin env exp1 exp2
-                        (_, exp1') <- inferExp env exp1
-                        (_, exp2') <- inferExp env exp2
+                        --typ <- inferBin env exp1 exp2
+                        (typ1, exp1') <- inferExp env exp1
+                        (typ2, exp2') <- inferExp env exp2
+                        typ <- inferBin typ1 typ2
                         Ok (typ, A.ETyped (A.EAdd exp1' exp2') typ)
                     ESub exp1 exp2 -> do
-                        typ <- inferBin env exp1 exp2
-                        (_, exp1') <- inferExp env exp1
-                        (_, exp2') <- inferExp env exp2
+                        --typ <- inferBin env exp1 exp2
+                        (typ1, exp1') <- inferExp env exp1
+                        (typ2, exp2') <- inferExp env exp2
+                        typ <- inferBin typ1 typ2
                         Ok (typ, A.ETyped (A.ESub exp1' exp2') typ)
                     ELess exp1 exp2 -> do
-                        inferBin env exp1 exp2
+                        --inferBin env exp1 exp2
                         (_, exp1') <- inferExp env exp1
                         (_, exp2') <- inferExp env exp2
                         Ok (TBool, A.ETyped (A.ELess exp1' exp2') TBool)
                     EGre exp1 exp2 -> do
-                        inferBin env exp1 exp2  
+                        --inferBin env exp1 exp2  
                         (_, exp1') <- inferExp env exp1
                         (_, exp2') <- inferExp env exp2         
                         return (TBool, A.ETyped (A.EGre exp1' exp2') TBool)
                     ELeq exp1 exp2 ->do
-                        inferBin env exp1 exp2 
+                        --inferBin env exp1 exp2 
                         (_, exp1') <- inferExp env exp1
                         (_, exp2') <- inferExp env exp2          
                         Ok (TBool, A.ETyped (A.ELeq exp1' exp2') TBool)
                     EGeq exp1 exp2 ->do
-                        inferBin env exp1 exp2  
+                        --inferBin env exp1 exp2  
                         (_, exp1') <- inferExp env exp1
                         (_, exp2') <- inferExp env exp2         
                         Ok (TBool, A.ETyped (A.EGeq exp1' exp2') TBool) 
@@ -194,15 +198,15 @@ isValidType TInt TDouble = True
 isValidType TDouble TInt = True
 isValidType typ1 typ2 = typ1 == typ2 && typ1 /= TVoid
 
-inferBin :: Env -> Exp -> Exp -> Err Type
-inferBin env exp1 exp2 = case inferExp env exp1 of
-                            Ok (TInt,_) -> case inferExp env exp2 of
-                                Ok (TInt,_) -> Ok TInt
-                                Ok (TDouble,_) -> Ok TDouble
+inferBin :: Type -> Type -> Err Type
+inferBin typ1 typ2 = case typ1 of
+                            TInt -> case typ2 of
+                                TInt -> Ok TInt
+                                TDouble -> Ok TDouble
                                 _ -> Bad "Bad type"
-                            Ok (TDouble, _) -> case inferExp env exp2 of
-                                Ok (TInt, _) -> Ok TDouble
-                                Ok (TDouble,_) -> Ok TDouble
+                            TDouble -> case typ2 of
+                                TInt -> Ok TDouble
+                                TDouble -> Ok TDouble
                                 _ -> Bad "Bad type"
                             _ -> Bad "Bad type"
 

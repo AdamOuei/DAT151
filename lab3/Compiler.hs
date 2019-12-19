@@ -301,6 +301,8 @@ compileExp' (ETyped exp typ) =
                             case typ of 
                               TDouble -> emit $ "d" ++ op
                               TInt -> emit $ "i" ++ op
+                            emit $ ";; " ++ show exp1
+                            emit $ ";; " ++ show exp2
 
                             
 
