@@ -363,8 +363,8 @@ equalValue (VBool a) (VBool b) = VBool $ a == b
 notEqualValue :: Val -> Val -> Val
 notEqualValue (VInt a) (VInt b) = VBool $ a/=b
 notEqualValue (VDouble a) (VDouble b) = VBool $ a/=b
-equalValue (VInt a) (VDouble b) = VBool $ fromIntegral a /= b
-equalValue (VDouble a) (VInt b) = VBool $ a /= fromIntegral b
+notEqualValue (VInt a) (VDouble b) = VBool $ fromIntegral a /= b
+notEqualValue (VDouble a) (VInt b) = VBool $ a /= fromIntegral b
 notEqualValue (VBool a) (VBool b) = VBool $ a /= b
 
 
