@@ -17,6 +17,7 @@ import qualified Data.Map as Map
 
 import Fun.Abs
 import Fun.Print
+import Fun.ErrM
 
 -- | Evaluation strategy.
 
@@ -26,7 +27,7 @@ data Strategy
 
 -- | Error monad.
 
-type Err = Except String
+--type Err = Except String
 
 data Cxt = Cxt { cxtStrategy :: Strategy, cxtSig :: Sig, cxtEnv :: Env}
 
@@ -48,14 +49,14 @@ interpret strategy (Prog defs (DMain mainExp)) = do
 eval :: Cxt -> Exp -> Err Value
 eval cxt = \case
 
-      EInt i -> return $ VInt i
+      EInt int -> return $ VInt int
 
-      EVar x -> do
-          case Map.lookup x (ctxEnv ctx) of
+      EVar id -> 
+          case Map.lookup id (cxtEnv cxt) of
             Just entry -> return $ entryValue cxt entry
-            Nothing -> Bad $ "unbound identifier" ++ printTree x
+            Nothing -> Bad $ "unbound identifier" ++ printTree id
 
-      EAbs x e -> return $ VFun  x e (ctxEnv ctx)
+      EAbs id exp -> return $ VFun id exp (cxtEnv cxt)
       
       EApp f a-> do
         v1 <- eval cxt f
@@ -65,20 +66,45 @@ eval cxt = \case
             case v1 of
               VInt{} -> Bad $ "Can not apply an integer"
               VFun x e env -> eval (cxt {cxtEnv = Map.insert x (Val v2) env }) e
-          CallByName -> do
+          CallByName -> 
             case v1 of
               VInt{} -> Bad $ "Can not apply an integer"
               VFun x e env -> do
                 let entry = Clos a (cxtEnv cxt)
                 eval (cxt {cxtEnv = Map.insert x entry env}) e
 
-
+      EAdd exp exp' -> do
+        (VInt a) <- eval cxt exp
+        (VInt b) <- eval cxt exp'
+        
+        return $ VInt (a+b)
+      ESub exp exp' -> do
+        (VInt a) <- eval cxt exp
+        (VInt b) <- eval cxt exp'
+        
+        return $ VInt (a-b)
+      ELt exp exp'  -> do
+        a <- eval cxt exp
+        b <- eval cxt exp'
+        if a < b then return $ VInt 1 else return $ VInt 0 
+      EIf cond thenExp elseExp -> do
+        u <- eval cxt cond 
+        case u of
+          VInt 1 -> eval cxt thenExp
+          VInt 0 -> eval cxt elseExp
+          _ -> Bad $ "Not valid" 
         
 
-      
+
+entryValue :: Cxt -> Entry -> Value
+entryValue cxt  = \case
+          Val val-> val
+          Clos exp env -> do 
+            v <- eval cxt exp
+            return v
 
 
-      EAdd e e' = todo
-      ESub e e' = todo
-      ELt e e'  = todo
-      EIf c t e = todo
+--lookupVar :: Id -> Env -> Value 
+
+
+--updateEnv :: Env -> Id -> Value -> Env
