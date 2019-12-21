@@ -56,7 +56,7 @@ inferExp env exp = case exp of
                                         (argsTypes,typ) <- lookupFun env id
                                         expTypes <- mapM (\exp -> inferExp env exp) argExps
                                         --let ls = map (uncurry $ isValidAss) $ zip argsTypes expTypes
-                                        if argsTypes == expTypes then --and ls then
+                                        if isValidArgs argsTypes expTypes then--(\typ1 typ2 -> --argsTypes == expTypes then --and ls then
                                             return typ
                                         else
                                             Bad "Function has wrong argument types"
@@ -198,7 +198,7 @@ checkStm retTyp env stm =
                             else Bad "Types doesn't match"
                         SRet exp -> do
                             typ <- inferExp env exp
-                            if typ == retTyp then return env
+                            if isValidAss retTyp typ then return env
                             else Bad "Return type does not match"
                         SWhile exp stm' -> do
                                 let newEnv = newBlock env
