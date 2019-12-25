@@ -60,21 +60,22 @@ inferExp env exp = case exp of
                     EId id -> do 
                                 typ <- lookupVar env id
                                 Ok (typ, A.ETyped (A.EId id) typ)
-                    ECall id@(Id "printDouble") argExps -> do
-                        (argsTypes,typ) <- lookupFun env id
-                        list <- mapM (\exp -> inferExp env exp) argExps 
-                        let expTypes =  map fst list
-                        let argsExps = map snd list
-                        if (TInt `elem` argsTypes || TDouble `elem` argsTypes) && length argExps == 1 then
-                            return (typ, A.ETyped (A.ECall id argsExps) typ)
-                        else
-                            Bad "Function has wrong argument types"
+                    -- ECall id@(Id "printDouble") argExps -> do
+                    --     (argsTypes,typ) <- lookupFun env id
+                    --     list <- mapM (\exp -> inferExp env exp) argExps 
+                    --     let expTypes =  map fst list
+                    --     let argsExps = map snd list
+                    --     if (TInt `elem` argsTypes || TDouble `elem` argsTypes) && length argExps == 1 then
+                    --         return (typ, A.ETyped (A.ECall id argsExps) typ)
+                    --     else
+                    --         Bad "Function has wrong argument types"
                     ECall id argExps -> do 
                                         (argsTypes,typ) <- lookupFun env id
-                                        list <- mapM (\exp -> inferExp env exp) argExps
+                                        list <- mapM (inferExp env) argExps
                                         let expTypes =  map fst list
                                         let argsExps = map snd list
-                                        if argsTypes ==  expTypes then --and ls then
+                                        if length argExps == length argsTypes && isValidArgs argsTypes expTypes
+                                            then --and ls then
                                             return (typ, A.ETyped (A.ECall id argsExps) typ)
                                         else
                                             Bad "Function has wrong argument types"
@@ -186,8 +187,10 @@ isBad (Bad _) = True
 isBad _ = False
 
 isValidArgs :: [Type] -> [Type] -> Bool
-isValidArgs (typ1:[]) (typ2:[]) = isValidAss typ1 typ2
-isValidArgs (typ1:xs) (typ2:ys) = if isValidAss typ1 typ2 then isValidArgs xs ys else False
+isValidArgs _ [] = True
+isValidArgs [] _ = True
+isValidArgs [typ1] [typ2] = isValidAss typ1 typ2
+isValidArgs (typ1:xs) (typ2:ys) = isValidAss typ1 typ2 && isValidArgs xs ys
 
 isValidAss :: Type -> Type -> Bool
 isValidAss TDouble TInt = True

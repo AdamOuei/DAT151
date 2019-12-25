@@ -45,24 +45,25 @@ inferExp env exp = case exp of
                     ETrue -> Ok TBool
                     EFalse -> Ok TBool
                     EId id -> lookupVar env id
-                    ECall id@(Id "printDouble") argExps -> do
-                                            (argsTypes,typ) <- lookupFun env id
-                                            expTypes <- mapM (\exp -> inferExp env exp) argExps 
-                                            if (TInt `elem` argsTypes || TDouble `elem` argsTypes) && length argExps == 1 then
-                                                return typ
-                                            else
-                                                Bad "Function has wrong argument types"
+                    -- ECall id@(Id "printDouble") argExps -> do
+                    --                         (argsTypes,typ) <- lookupFun env id
+                    --                         expTypes <- mapM (\exp -> inferExp env exp) argExps 
+                    --                         if (TInt `elem` argsTypes || TDouble `elem` argsTypes) && length argExps == 1 then
+                    --                             return typ
+                    --                         else
+                    --                             Bad "Function has wrong argument types"
                     ECall id argExps -> do 
                                         (argsTypes,typ) <- lookupFun env id
-                                        expTypes <- mapM (\exp -> inferExp env exp) argExps
-                                        --let ls = map (uncurry $ isValidAss) $ zip argsTypes expTypes
-                                        if isValidArgs argsTypes expTypes then--(\typ1 typ2 -> --argsTypes == expTypes then --and ls then
+                                        
+                                        expTypes <- mapM (inferExp env) argExps
+                                        
+                                        if length argExps == length argsTypes && isValidArgs argsTypes expTypes
+                                            then
+                                            
                                             return typ
                                         else
                                             Bad "Function has wrong argument types"
-                                        --mapM_ (uncurry $ checkExp env) $ zip  argsTypes argExps
-                                        --return typ
-                -- Maybe change to TBool and add void
+                                        
                     EInc id -> do
                                 typ <- lookupVar env id
                                 if typ `elem` [TInt,TDouble] then
@@ -141,8 +142,10 @@ isBad (Bad _) = True
 isBad _ = False
 
 isValidArgs :: [Type] -> [Type] -> Bool
-isValidArgs (typ1:[]) (typ2:[]) = isValidAss typ1 typ2
-isValidArgs (typ1:xs) (typ2:ys) = if isValidAss typ1 typ2 then isValidArgs xs ys else False
+isValidArgs _ [] = True
+isValidArgs [] _ = True
+isValidArgs [typ1] [typ2] = isValidAss typ1 typ2
+isValidArgs (typ1:xs) (typ2:ys) = isValidAss typ1 typ2 && isValidArgs xs ys
 
 isValidAss :: Type -> Type -> Bool
 isValidAss TDouble TInt = True

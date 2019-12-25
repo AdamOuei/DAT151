@@ -35,7 +35,8 @@ parse s = case pProgram (myLexer s) of
     putStrLn "SYNTAX ERROR"
     putStrLn err
     exitFailure
-  Ok prg -> return prg
+  Ok prg -> do
+    return prg
 
 
 -- | Interpret in call-by-value or call-by-name.

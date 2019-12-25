@@ -17,6 +17,9 @@ files=lab4.hs Fun.cf Makefile Interpreter.hs
 lab4 : $(files) Fun/Test
 	ghc --make lab4.hs -o lab4
 
+test: lab4
+	./lab4 testFiles/testFile.hs
+
 # Rules to build the parser:
 
 Fun/Test.hs Fun/Lex.x Fun/Par.y : Fun.cf

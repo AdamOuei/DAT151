@@ -1,4 +1,4 @@
--- | Interpreter for lambda-calculus with if, +, -, <.
+-- --| Interpreter for lambda-calculus with if, +, -, <.
 --
 --   Strategy can be either call-by-value or call-by-name.
 
@@ -14,10 +14,10 @@ import Control.Monad.Except
 import Data.Functor
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Debug.Trace
 
 import Fun.Abs
 import Fun.Print
-import Fun.ErrM
 
 -- | Evaluation strategy.
 
@@ -27,7 +27,7 @@ data Strategy
 
 -- | Error monad.
 
---type Err = Except String
+type Err = Except String
 
 data Cxt = Cxt { cxtStrategy :: Strategy, cxtSig :: Sig, cxtEnv :: Env}
 
@@ -43,18 +43,27 @@ data Entry = Val Value | Clos Exp Env
 
 interpret :: Strategy -> Program -> Err Integer
 interpret strategy (Prog defs (DMain mainExp)) = do
-  throwError $ "TODO: implement interpreter"
-
+    let sig = foldl makeThisWork Map.empty defs
+    let cxt = (Cxt {cxtSig = sig, cxtEnv = Map.empty, cxtStrategy = strategy})
+    eval cxt mainExp >>= convertToInt
+    where 
+        makeThisWork :: Sig -> Def -> Sig
+        makeThisWork mapp def@(DDef ident ids exp) = Map.insert ident (makeShit ids exp) mapp
+        makeShit :: [Ident] -> Exp -> Exp
+        makeShit xs exp = foldr EAbs exp xs
 
 eval :: Cxt -> Exp -> Err Value
 eval cxt = \case
 
       EInt int -> return $ VInt int
 
-      EVar id -> 
+      EVar id ->
+          
           case Map.lookup id (cxtEnv cxt) of
-            Just entry -> return $ entryValue cxt entry
-            Nothing -> Bad $ "unbound identifier" ++ printTree id
+            Just entry -> entryValue cxt entry
+            Nothing -> case Map.lookup id (cxtSig cxt) of
+              Just e -> eval (cxt{cxtEnv = Map.empty}) e
+              Nothing -> throwError $ "unbound identifier" ++ printTree id
 
       EAbs id exp -> return $ VFun id exp (cxtEnv cxt)
       
@@ -64,47 +73,49 @@ eval cxt = \case
           CallByValue -> do 
             v2 <- eval cxt a
             case v1 of
-              VInt{} -> Bad $ "Can not apply an integer"
+              VInt{} -> throwError "Can not apply an integer"
               VFun x e env -> eval (cxt {cxtEnv = Map.insert x (Val v2) env }) e
           CallByName -> 
             case v1 of
-              VInt{} -> Bad $ "Can not apply an integer"
+              VInt{} -> throwError "Can not apply an integer"
               VFun x e env -> do
                 let entry = Clos a (cxtEnv cxt)
                 eval (cxt {cxtEnv = Map.insert x entry env}) e
 
       EAdd exp exp' -> do
-        (VInt a) <- eval cxt exp
-        (VInt b) <- eval cxt exp'
-        
+        a <- eval cxt exp >>= convertToInt 
+        b <- eval cxt exp' >>= convertToInt 
+
         return $ VInt (a+b)
       ESub exp exp' -> do
-        (VInt a) <- eval cxt exp
-        (VInt b) <- eval cxt exp'
-        
+        a <- eval cxt exp >>= convertToInt 
+        b <- eval cxt exp' >>= convertToInt 
+
         return $ VInt (a-b)
       ELt exp exp'  -> do
-        a <- eval cxt exp
-        b <- eval cxt exp'
+        a <- eval cxt exp >>= convertToInt 
+        b <- eval cxt exp' >>= convertToInt 
+
         if a < b then return $ VInt 1 else return $ VInt 0 
       EIf cond thenExp elseExp -> do
-        u <- eval cxt cond 
-        case u of
-          VInt 1 -> eval cxt thenExp
-          VInt 0 -> eval cxt elseExp
-          _ -> Bad $ "Not valid" 
+         u <- eval cxt cond >>= convertToInt
+         case u of
+          1 -> eval cxt thenExp
+          0 -> eval cxt elseExp
+          _ -> throwError "Not valid"
+
+
+          
+convertToInt :: Value -> Err Integer
+convertToInt (VInt a ) = return a
+convertToInt _ = throwError "Not an integer"
         
 
-
-entryValue :: Cxt -> Entry -> Value
+entryValue :: Cxt -> Entry -> Err Value
 entryValue cxt  = \case
-          Val val-> val
-          Clos exp env -> do 
-            v <- eval cxt exp
-            return v
+          Val val-> return val
+          Clos exp env -> eval (cxt{cxtEnv = env}) exp
+               
 
-
---lookupVar :: Id -> Env -> Value 
-
-
---updateEnv :: Env -> Id -> Value -> Env
+-- updateCxt :: Cxt -> Ident -> Entry -> Err Cxt
+-- updateCxt cxt id entry = return cxt{cxtEnv = Map.insert id entry (cxtEnv cxt), cxtSig =  cxtSig cxt}

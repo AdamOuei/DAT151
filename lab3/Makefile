@@ -22,6 +22,7 @@ lab3 : $(files) CMM/Test
 
 test: lab3
 	./lab3 testFiles/testFile.cc
+	
 
 # Rules to build the parser:
 
