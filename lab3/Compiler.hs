@@ -326,7 +326,7 @@ compileFun :: Func -> State Env ()
 compileFun (DFun typ id args body) = do
             funString <- lookupFun id
             emit $ ".method public static " ++ funString
-            emit ".limit locals 1000"
+            emit ".limit locals 100"
             emit ".limit stack 1000"
             mapM_  (\(FArgs typ id) -> extendId typ id) args 
             mapM_ compileStm body

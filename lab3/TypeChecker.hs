@@ -51,15 +51,15 @@ isMain env =
             
 
 
-inferExp :: Env -> Exp -> Err (Type,A.Exp)  
+inferExp :: Env -> Exp -> Err A.Exp
 inferExp env exp = case exp of
-                    EInt int -> Ok (TInt, A.ETyped (A.EInt int) TInt )
-                    EDouble doub -> Ok (TDouble, A.ETyped (A.EDouble doub) TDouble)
-                    ETrue -> Ok (TBool, A.ETyped A.ETrue TBool)
-                    EFalse -> Ok (TBool, A.ETyped A.EFalse TBool)
+                    EInt int -> Ok ( A.ETyped (A.EInt int) TInt )
+                    EDouble doub -> Ok (A.ETyped (A.EDouble doub) TDouble)
+                    ETrue -> Ok ( A.ETyped A.ETrue TBool)
+                    EFalse -> Ok ( A.ETyped A.EFalse TBool)
                     EId id -> do 
                                 typ <- lookupVar env id
-                                Ok (typ, A.ETyped (A.EId id) typ)
+                                Ok  (A.ETyped (A.EId id) typ)
                     -- ECall id@(Id "printDouble") argExps -> do
                     --     (argsTypes,typ) <- lookupFun env id
                     --     list <- mapM (\exp -> inferExp env exp) argExps 
@@ -71,115 +71,116 @@ inferExp env exp = case exp of
                     --         Bad "Function has wrong argument types"
                     ECall id argExps -> do 
                                         (argsTypes,typ) <- lookupFun env id
-                                        list <- mapM (inferExp env) argExps
-                                        let expTypes =  map fst list
-                                        let argsExps = map snd list
+                                        argsExps <- mapM (inferExp env) argExps
+                                        let expTypes =  map (\(A.ETyped _ typ' ) -> typ') argsExps 
+                                        --let argsExps = map snd list
+                                        
                                         if length argExps == length argsTypes && isValidArgs argsTypes expTypes
                                             then --and ls then
-                                            return (typ, A.ETyped (A.ECall id argsExps) typ)
+                                            return (A.ETyped (A.ECall id argsExps) typ)
                                         else
                                             Bad "Function has wrong argument types"
                     EInc id -> do
                                 typ <- lookupVar env id
                                 if typ `elem` [TInt,TDouble] then
-                                    return (typ, A.ETyped (A.EInc id) typ)
+                                    return (A.ETyped (A.EInc id) typ)
                                     else
                                         Bad $ "Id " ++ printTree id ++ " has wrong type"
                     EDec id -> do
                             typ <- lookupVar env id
                             if typ `elem` [TInt,TDouble] then
-                                return (typ, A.ETyped  (A.EDec id) typ)
+                                return (A.ETyped  (A.EDec id) typ)
                             else
                                 Bad $ "Id " ++ printTree id ++ " has wrong type"
                     EInc2 id ->  do
                             typ <- lookupVar env id
                             if typ `elem` [TInt,TDouble] then
-                                return (typ, A.ETyped ( A.EInc2 id) typ)
+                                return ( A.ETyped ( A.EInc2 id) typ)
                             else
                                 Bad $ "Id " ++ printTree id ++ " has wrong type"
                     EDec2 id ->  do
                             typ <- lookupVar env id
                             if typ `elem` [TInt,TDouble] then
-                                return (typ, A.ETyped (A.EDec2 id) typ)
+                                return (A.ETyped (A.EDec2 id) typ)
                             else
                                 Bad $ "Id " ++ printTree id ++ " has wrong type"
                     EMul exp1 exp2 -> do
                         --typ <- inferBin env exp1 exp2
-                        (typ1, exp1') <- inferExp env exp1
-                        (typ2, exp2') <- inferExp env exp2
+                        exp1'@(A.ETyped _ typ1) <- inferExp env exp1
+                        exp2'@(A.ETyped _ typ2) <- inferExp env exp2
                         typ <- inferBin typ1 typ2
-                        Ok (typ, A.ETyped (A.EMul exp1' exp2') typ)
+                        Ok (A.ETyped (A.EMul exp1' exp2') typ)
                     EDiv exp1 exp2 -> do
                         --typ <- inferBin env exp1 exp2
-                        (typ1, exp1') <- inferExp env exp1
-                        (typ2, exp2') <- inferExp env exp2
+                        exp1'@(A.ETyped _ typ1) <- inferExp env exp1
+                        exp2'@(A.ETyped _ typ2) <- inferExp env exp2
                         typ <- inferBin typ1 typ2
-                        Ok (typ, A.ETyped (A.EDiv exp1' exp2') typ)
+                        Ok (A.ETyped (A.EDiv exp1' exp2') typ)
                     EAdd exp1 exp2 -> do
                         --typ <- inferBin env exp1 exp2
-                        (typ1, exp1') <- inferExp env exp1
-                        (typ2, exp2') <- inferExp env exp2
+                        exp1'@(A.ETyped _ typ1) <- inferExp env exp1
+                        exp2'@(A.ETyped _ typ2) <- inferExp env exp2
                         typ <- inferBin typ1 typ2
-                        Ok (typ, A.ETyped (A.EAdd exp1' exp2') typ)
+                        Ok (A.ETyped (A.EAdd exp1' exp2') typ)
                     ESub exp1 exp2 -> do
                         --typ <- inferBin env exp1 exp2
-                        (typ1, exp1') <- inferExp env exp1
-                        (typ2, exp2') <- inferExp env exp2
+                        exp1'@(A.ETyped _ typ1) <- inferExp env exp1
+                        exp2'@(A.ETyped _ typ2) <- inferExp env exp2
                         typ <- inferBin typ1 typ2
-                        Ok (typ, A.ETyped (A.ESub exp1' exp2') typ)
+                        Ok ( A.ETyped (A.ESub exp1' exp2') typ)
                     ELess exp1 exp2 -> do
                         --inferBin env exp1 exp2
-                        (_, exp1') <- inferExp env exp1
-                        (_, exp2') <- inferExp env exp2
-                        Ok (TBool, A.ETyped (A.ELess exp1' exp2') TBool)
+                        exp1'<- inferExp env exp1
+                        exp2' <- inferExp env exp2
+                        Ok ( A.ETyped (A.ELess exp1' exp2') TBool)
                     EGre exp1 exp2 -> do
                         --inferBin env exp1 exp2  
-                        (_, exp1') <- inferExp env exp1
-                        (_, exp2') <- inferExp env exp2         
-                        return (TBool, A.ETyped (A.EGre exp1' exp2') TBool)
+                        exp1'<- inferExp env exp1
+                        exp2' <- inferExp env exp2        
+                        return (A.ETyped (A.EGre exp1' exp2') TBool)
                     ELeq exp1 exp2 ->do
                         --inferBin env exp1 exp2 
-                        (_, exp1') <- inferExp env exp1
-                        (_, exp2') <- inferExp env exp2          
-                        Ok (TBool, A.ETyped (A.ELeq exp1' exp2') TBool)
+                        exp1'<- inferExp env exp1
+                        exp2' <- inferExp env exp2         
+                        Ok ( A.ETyped (A.ELeq exp1' exp2') TBool)
                     EGeq exp1 exp2 ->do
                         --inferBin env exp1 exp2  
-                        (_, exp1') <- inferExp env exp1
-                        (_, exp2') <- inferExp env exp2         
-                        Ok (TBool, A.ETyped (A.EGeq exp1' exp2') TBool) 
+                        exp1'<- inferExp env exp1
+                        exp2' <- inferExp env exp2         
+                        Ok (A.ETyped (A.EGeq exp1' exp2') TBool) 
                     EEqua exp1 exp2 -> do
-                        (typ1, exp1') <- inferExp env exp1     
-                        (typ2, exp2') <- inferExp env exp2
-                        if (isValidType typ1 typ2) then return (TBool, A.ETyped (A.EEqua exp1' exp2') TBool)
+                        exp1'@(A.ETyped _ typ1) <- inferExp env exp1
+                        exp2'@(A.ETyped _ typ2) <- inferExp env exp2
+                        if (isValidType typ1 typ2) then return (A.ETyped (A.EEqua exp1' exp2') TBool)
                         else
                             Bad "Not equal expressions equal"
                     EIneq exp1 exp2 -> do
-                        (typ1, exp1') <- inferExp env exp1     
-                        (typ2, exp2') <- inferExp env exp2
-                        if (isValidType typ1 typ2) then return (TBool, A.ETyped (A.EIneq exp1' exp2') TBool)
+                        exp1'@(A.ETyped _ typ1) <- inferExp env exp1
+                        exp2'@(A.ETyped _ typ2) <- inferExp env exp2
+                        if (isValidType typ1 typ2) then return (A.ETyped (A.EIneq exp1' exp2') TBool)
                         else
                             Bad "Not equal expressions inequal"
                     EConj exp1 exp2 -> do
-                        (typ1, exp1') <- inferExp env exp1     
-                        (typ2, exp2') <- inferExp env exp2
-                        if typ1 == typ2  && typ1 == TBool then return (TBool, A.ETyped (A.EConj exp1' exp2') TBool)
+                        exp1'@(A.ETyped _ typ1) <- inferExp env exp1
+                        exp2'@(A.ETyped _ typ2) <- inferExp env exp2
+                        if typ1 == typ2  && typ1 == TBool then return (A.ETyped (A.EConj exp1' exp2') TBool)
                         else
                             Bad "Not equal expressions conj"
                     EDisj exp1 exp2 -> do
-                        (typ1, exp1') <- inferExp env exp1     
-                        (typ2, exp2') <- inferExp env exp2
-                        if typ1 == typ2  && typ1 == TBool then return (TBool, A.ETyped (A.EDisj exp1' exp2') TBool)
+                        exp1'@(A.ETyped _ typ1) <- inferExp env exp1
+                        exp2'@(A.ETyped _ typ2) <- inferExp env exp2
+                        if typ1 == typ2  && typ1 == TBool then return (A.ETyped (A.EDisj exp1' exp2') TBool)
                         else
                             Bad "Not equal expressions disj"
                     EAss id exp -> do
                                 varTyp <- lookupVar env id
-                                (expTyp,exp') <- inferExp env exp
-                                if isValidAss varTyp expTyp then return (varTyp, A.ETyped (A.EAss id exp') varTyp)
+                                exp'@(A.ETyped _ expTyp) <- inferExp env exp
+                                if isValidAss varTyp expTyp then return (A.ETyped (A.EAss id exp') varTyp)
                                 else Bad "Not correct assignemnt" 
                     ETyped exp typ -> case checkExp env typ exp of
                                         Ok _ -> do
-                                            (expTyp, exp') <- inferExp env exp
-                                            Ok (typ, A.ETyped exp' expTyp)
+                                            exp' <- inferExp env exp
+                                            Ok (A.ETyped exp' typ)
                                         Bad s -> Bad s
 
 isBad :: Err a -> Bool
@@ -215,7 +216,7 @@ inferBin typ1 typ2 = case typ1 of
 
 checkExp :: Env -> Type -> Exp -> Err ()
 checkExp env typ exp = do
-    (expTyp,_) <- inferExp env exp
+    (A.ETyped _ expTyp) <- inferExp env exp
     if expTyp == typ then
         return ()
         else
@@ -230,22 +231,22 @@ checkStm :: Type -> Env -> Stm -> Err (Env, A.Stm)
 checkStm retTyp env stm =
                     case stm of 
                         SExp exp -> do
-                            (typ,exp') <- inferExp env exp
+                            exp'@(A.ETyped _ typ) <- inferExp env exp
                             return (env, A.SExp typ exp')
                         SDecls typ ids -> do
                                 env' <- foldM (\newEnv id -> updateVar newEnv id typ) env ids
                                 return (env', A.SDecls typ ids)               
                         SInit typ id exp -> do
                             newEnv <- updateVar env id typ
-                            (expTyp,exp') <- inferExp newEnv exp
+                            exp'@(A.ETyped _ expTyp) <- inferExp newEnv exp
                             if isValidAss typ expTyp then return (newEnv, A.SInit typ id exp')
                             else Bad "Types doesn't match"
                         SRet exp -> do
-                            (typ,exp') <- inferExp env exp
-                            if typ == retTyp then return (env, A.SRet typ exp')
+                            exp'@(A.ETyped _ typ) <- inferExp env exp
+                            if isValidAss retTyp typ then return (env, A.SRet typ exp')
                             else Bad "Return type does not match"
                         SWhile exp stm' -> do
-                                (_, exp' ) <- inferExp env exp
+                                exp' <- inferExp env exp
                                 let newEnv = newBlock env
                                 checkExp newEnv TBool exp
                                 (env', stm'') <- checkStm retTyp newEnv stm'
@@ -253,7 +254,7 @@ checkStm retTyp env stm =
                                 -- maybe env'
                                 return (env, A.SWhile exp' stm'')
                         SIf exp stm1 stm2 -> do 
-                                    (_, exp') <- inferExp env exp
+                                    exp' <- inferExp env exp
                                     let newEnv = newBlock env
                                     checkExp env TBool exp
                                     (env', stm1')<-  checkStm retTyp newEnv stm1
