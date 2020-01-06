@@ -30,7 +30,7 @@ typecheck (Prg prog) = do
     let funcs = map getTypes prog
     env <- foldM (\env (id,typ) -> updateFun env id typ ) emptyEnv funcs
     isMain env
-    list <- mapM (checkDef env) prog     --[(Env, A.Func)]
+    list <- mapM (checkDef env) prog
     let funList = map snd list
     return (A.PDefs funList)
 
@@ -48,9 +48,6 @@ isMain env =
             Ok ([], TInt) -> return ()
             _ -> Bad "No function main"
 
-            
-
-
 inferExp :: Env -> Exp -> Err A.Exp
 inferExp env exp = case exp of
                     EInt int -> Ok ( A.ETyped (A.EInt int) TInt )
@@ -60,24 +57,16 @@ inferExp env exp = case exp of
                     EId id -> do 
                                 typ <- lookupVar env id
                                 Ok  (A.ETyped (A.EId id) typ)
-                    -- ECall id@(Id "printDouble") argExps -> do
-                    --     (argsTypes,typ) <- lookupFun env id
-                    --     list <- mapM (\exp -> inferExp env exp) argExps 
-                    --     let expTypes =  map fst list
-                    --     let argsExps = map snd list
-                    --     if (TInt `elem` argsTypes || TDouble `elem` argsTypes) && length argExps == 1 then
-                    --         return (typ, A.ETyped (A.ECall id argsExps) typ)
-                    --     else
-                    --         Bad "Function has wrong argument types"
                     ECall id argExps -> do 
                                         (argsTypes,typ) <- lookupFun env id
                                         argsExps <- mapM (inferExp env) argExps
-                                        let expTypes =  map (\(A.ETyped _ typ' ) -> typ') argsExps 
-                                        --let argsExps = map snd list
+                                        let expTypes =  map (\(A.ETyped _ typ' ) -> typ') argsExps
+                                        let matchingType = zip
                                         
                                         if length argExps == length argsTypes && isValidArgs argsTypes expTypes
-                                            then --and ls then
-                                            return (A.ETyped (A.ECall id argsExps) typ)
+                                            then do 
+                                                let newExps = zipWith checkType argsExps argsTypes
+                                                return (A.ETyped (A.ECall id newExps) typ)
                                         else
                                             Bad "Function has wrong argument types"
                     EInc id -> do
@@ -105,46 +94,38 @@ inferExp env exp = case exp of
                             else
                                 Bad $ "Id " ++ printTree id ++ " has wrong type"
                     EMul exp1 exp2 -> do
-                        --typ <- inferBin env exp1 exp2
                         exp1'@(A.ETyped _ typ1) <- inferExp env exp1
                         exp2'@(A.ETyped _ typ2) <- inferExp env exp2
                         typ <- inferBin typ1 typ2
                         Ok (A.ETyped (A.EMul exp1' exp2') typ)
                     EDiv exp1 exp2 -> do
-                        --typ <- inferBin env exp1 exp2
                         exp1'@(A.ETyped _ typ1) <- inferExp env exp1
                         exp2'@(A.ETyped _ typ2) <- inferExp env exp2
                         typ <- inferBin typ1 typ2
                         Ok (A.ETyped (A.EDiv exp1' exp2') typ)
-                    EAdd exp1 exp2 -> do
-                        --typ <- inferBin env exp1 exp2
+                    EAdd exp1 exp2 -> do      
                         exp1'@(A.ETyped _ typ1) <- inferExp env exp1
                         exp2'@(A.ETyped _ typ2) <- inferExp env exp2
                         typ <- inferBin typ1 typ2
                         Ok (A.ETyped (A.EAdd exp1' exp2') typ)
-                    ESub exp1 exp2 -> do
-                        --typ <- inferBin env exp1 exp2
+                    ESub exp1 exp2 -> do     
                         exp1'@(A.ETyped _ typ1) <- inferExp env exp1
                         exp2'@(A.ETyped _ typ2) <- inferExp env exp2
                         typ <- inferBin typ1 typ2
                         Ok ( A.ETyped (A.ESub exp1' exp2') typ)
                     ELess exp1 exp2 -> do
-                        --inferBin env exp1 exp2
                         exp1'<- inferExp env exp1
                         exp2' <- inferExp env exp2
                         Ok ( A.ETyped (A.ELess exp1' exp2') TBool)
-                    EGre exp1 exp2 -> do
-                        --inferBin env exp1 exp2  
+                    EGre exp1 exp2 -> do  
                         exp1'<- inferExp env exp1
                         exp2' <- inferExp env exp2        
                         return (A.ETyped (A.EGre exp1' exp2') TBool)
-                    ELeq exp1 exp2 ->do
-                        --inferBin env exp1 exp2 
+                    ELeq exp1 exp2 ->do 
                         exp1'<- inferExp env exp1
                         exp2' <- inferExp env exp2         
                         Ok ( A.ETyped (A.ELeq exp1' exp2') TBool)
-                    EGeq exp1 exp2 ->do
-                        --inferBin env exp1 exp2  
+                    EGeq exp1 exp2 ->do  
                         exp1'<- inferExp env exp1
                         exp2' <- inferExp env exp2         
                         Ok (A.ETyped (A.EGeq exp1' exp2') TBool) 
@@ -182,6 +163,13 @@ inferExp env exp = case exp of
                                             exp' <- inferExp env exp
                                             Ok (A.ETyped exp' typ)
                                         Bad s -> Bad s
+
+checkType :: A.Exp -> Type -> A.Exp
+checkType exp@(A.ETyped exp' typ') typ = 
+    if typ' == typ then exp else
+        case exp' of
+            A.EInt i -> A.ETyped (A.EDouble (fromIntegral i)) typ
+            _ -> A.ETyped exp' typ
 
 isBad :: Err a -> Bool
 isBad (Bad _) = True
@@ -224,9 +212,6 @@ checkExp env typ exp = do
                "expected " ++ printTree typ ++
                "but found " ++ printTree expTyp
 
-
-
-
 checkStm :: Type -> Env -> Stm -> Err (Env, A.Stm)
 checkStm retTyp env stm =
                     case stm of 
@@ -243,15 +228,13 @@ checkStm retTyp env stm =
                             else Bad "Types doesn't match"
                         SRet exp -> do
                             exp'@(A.ETyped _ typ) <- inferExp env exp
-                            if isValidAss retTyp typ then return (env, A.SRet typ exp')
+                            if isValidAss retTyp typ then return (env, A.SRet retTyp exp')
                             else Bad "Return type does not match"
                         SWhile exp stm' -> do
                                 exp' <- inferExp env exp
                                 let newEnv = newBlock env
                                 checkExp newEnv TBool exp
                                 (env', stm'') <- checkStm retTyp newEnv stm'
-                                
-                                -- maybe env'
                                 return (env, A.SWhile exp' stm'')
                         SIf exp stm1 stm2 -> do 
                                     exp' <- inferExp env exp
@@ -259,15 +242,11 @@ checkStm retTyp env stm =
                                     checkExp env TBool exp
                                     (env', stm1')<-  checkStm retTyp newEnv stm1
                                     (env'',stm2') <- checkStm retTyp newEnv stm2
-                                     -- maybe env'' (?)
                                     return (env, A.SIf exp' stm1' stm2')
                         SBlock stmxs -> do
                                     let newEnv = newBlock env
                                     (env', stms') <- checkStms retTyp (newBlock env) stmxs
                                     return (env, A.SBlock stms')
-
--- transformExp :: Exp -> A.Exp
--- transformExp exp = 
 
 checkStms :: Type -> Env ->  [Stm] -> Err (Env, [A.Stm])
 checkStms typ env [] = return (env, [])
@@ -305,7 +284,6 @@ updateVar (sig, top:stack) id typ =
                     let newStack = Map.insert id typ top 
                     Ok (sig, newStack:stack)
                 Just id -> Bad $ "Already in environment" ++ printTree id
-                --Ok _ -> Ok (sig, top:stack)
 
 updateFun :: Env -> Id -> ([Type],Type) -> Err Env
 updateFun env@(sig, stack) id funcTypes = 

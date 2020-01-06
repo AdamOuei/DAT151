@@ -30,7 +30,9 @@ data Env = Env {
   code :: [Instruction],
   labelCount :: Int,
   funs :: Map Id FunString,
-  className :: String
+  className :: String,
+  locals :: Int,
+  stack :: Int
 }
 
 
@@ -98,9 +100,13 @@ compileStm stm =
               SRet typ exp -> do
                   compileExp typ exp
                   case typ of
-                    TDouble -> emit "dreturn"
+                    TDouble -> do 
+                      emit "dreturn"
+                      modify (\env -> env{stack = 2 + stack env})
                     TVoid -> return ()
-                    _ -> emit "ireturn"
+                    _ ->do 
+                        emit "ireturn"
+                        modify (\env -> env{stack = 1 + stack env}) 
               SWhile exp stm' -> do
                    test <- newLabel "TEST"
                    end <- newLabel "END"
@@ -137,23 +143,37 @@ compileExp _ exp = compileExp' exp
 compileExp' :: Exp -> State Env ()
 compileExp' (ETyped exp typ) = 
           case exp of
-                    EInt int -> emit $ "ldc " ++ show int
-                    EDouble doub -> emit $ "ldc2_w " ++ show doub
-                    ETrue -> emit "bipush 1 "
-                    EFalse -> emit "bipush 0 "
+                    EInt int -> do 
+                      emit $ "ldc " ++ show int
+                      modify (\env -> env{stack = 1 + stack env})
+                    EDouble doub -> do 
+                      emit $ "ldc2_w " ++ show doub
+                      modify (\env -> env{stack = 2 + stack env})
+                    ETrue -> do
+                       emit "bipush 1 "
+                       modify (\env -> env{stack = 1 + stack env})
+
+                    EFalse -> do 
+                          emit "bipush 0 "
+                          modify (\env -> env{stack = 1 + stack env})
                     EId id -> do
                             addr <- lookupAddr id
                             let load_string = if typ == TDouble
                                               then "dload "
                                               else "iload "
+                            if typ == TDouble 
+                              then modify (\env -> env{stack = 2 + stack env})
+                              else modify (\env -> env{stack = 1 + stack env})
                             emit $ load_string ++ show addr 
 
                     ECall id@(Id "printDouble") argExps -> do
                       mapM_ (compileExp TDouble) argExps
+                    
                       sig <- getSig id
                       emit $ "invokestatic " ++ sig  
                     ECall id argExps -> do
                       mapM_ compileExp' argExps
+                      emit $ ";;" ++ show argExps
                       sig <- getSig id
                       emit $ "invokestatic " ++ sig
                     EInc id -> do
@@ -165,9 +185,11 @@ compileExp' (ETyped exp typ) =
                                   emit $ "dconst_1"
                                   emit $ "dadd"
                                   emit $ "dstore " ++ show addr
+                                  modify (\env -> env{stack = 6 + stack env})
 
                         _ ->do emit $ "iload " ++ show addr
                                emit $ "iinc " ++ show addr ++ " 1"
+                               modify (\env -> env{stack = 1 + stack env})
                     EDec id -> do
                       addr <- lookupAddr id
                       case typ of
@@ -177,9 +199,11 @@ compileExp' (ETyped exp typ) =
                                   emit $ "dconst_1"
                                   emit $ "dsub"
                                   emit $ "dstore " ++ show addr
+                                  modify (\env -> env{stack = 6 + stack env})
                         _ -> do 
                              emit $ "iload " ++ show addr
                              emit $ "iinc " ++ show addr ++ " -1"
+                             modify (\env -> env{stack = 1+ stack env})
                     EInc2 id ->do
                       addr <- lookupAddr id
                       
@@ -190,9 +214,11 @@ compileExp' (ETyped exp typ) =
                           emit "dadd"
                           emit "dup2"
                           emit $ "dstore " ++ show addr
+                          modify (\env -> env{stack = 4 + stack env})
                         _ ->do 
                             emit $ "iinc "  ++ show addr ++ " 1"
                             emit $ "iload " ++ show addr
+                            modify (\env -> env{stack = 1 + stack env})
                     EDec2 id ->do
                       addr <- lookupAddr id
                       
@@ -203,9 +229,11 @@ compileExp' (ETyped exp typ) =
                           emit "dsub"
                           emit "dup2"
                           emit $ "dstore " ++ show addr
+                          modify (\env -> env{stack = 4 + stack env})
                         _ ->do
                           emit $ "iinc " ++ show addr ++ " -1" 
                           emit $ "iload " ++ show addr
+                          modify (\env -> env{stack = 1 + stack env})
                     EMul exp1 exp2 -> arethOp exp1 exp2 "mul"
                     EDiv  exp1 exp2 ->  arethOp exp1 exp2 "div"
                     EAdd  exp1 exp2 ->  arethOp exp1 exp2 "add"  
@@ -248,6 +276,7 @@ compileExp' (ETyped exp typ) =
                       emit "pop "
                       compileExp' exp2
                       emit $ end ++ ":"
+                      modify (\env -> env{stack = 1 + stack env})
                     EDisj exp1 exp2 -> do
                       compileExp' exp1
                       end <- newLabel "END"
@@ -256,6 +285,7 @@ compileExp' (ETyped exp typ) =
                       emit "pop "
                       compileExp' exp2
                       emit $ end ++ ":"
+                      modify (\env -> env{stack = 1 + stack env})
                     EAss id exp -> do
                       compileExp typ exp
                       addr <- lookupAddr id
@@ -263,9 +293,11 @@ compileExp' (ETyped exp typ) =
                         TDouble ->do
                            emit "dup2"
                            emit $ "dstore " ++ show addr
+                           modify (\env -> env{stack = 2 + stack env})
                         _ -> do
                           emit "dup"
                           emit $ "istore " ++ show addr
+                          modify (\env -> env{stack = 1 + stack env})
             where 
                           integerCompare :: Type -> Exp -> Exp -> String -> State Env ()
                           integerCompare t exp1 exp2 op =
@@ -280,6 +312,7 @@ compileExp' (ETyped exp typ) =
                               emit $ true ++ ":"
                               emit "bipush 1"
                               emit $ end ++ ":"
+                              modify (\env -> env{stack = 2 + stack env})
                           doubleCompare :: Type -> Exp -> Exp -> String -> State Env ()
                           doubleCompare t exp1 exp2 op = do 
                             compileExp t exp1
@@ -293,6 +326,7 @@ compileExp' (ETyped exp typ) =
                             emit $ true ++ ":"
                             emit "bipush 1"
                             emit $ end ++ ":"
+                            modify (\env -> env{stack = 2 + stack env})
                           arethOp :: Exp -> Exp -> String -> State Env ()
                           arethOp exp1 exp2 op = do
                             let typ = inferBin exp1 exp2 
@@ -301,14 +335,8 @@ compileExp' (ETyped exp typ) =
                             case typ of 
                               TDouble -> emit $ "d" ++ op
                               TInt -> emit $ "i" ++ op
-                            emit $ ";; " ++ show exp1
-                            emit $ ";; " ++ show exp2
 
                             
-
-                            
-
-                      
 inferBin :: Exp -> Exp -> Type
 inferBin (ETyped _ typ1) (ETyped _ typ2) = 
                     case typ1 of
@@ -324,16 +352,23 @@ inferBin' exp1 exp2 = inferBin exp1 exp2
 
 compileFun :: Func -> State Env ()
 compileFun (DFun typ id args body) = do
+            env  <- get
+            put env {locals = 0, stack = 0}
             funString <- lookupFun id
-            emit $ ".method public static " ++ funString
-            emit ".limit locals 100"
-            emit ".limit stack 1000"
             mapM_  (\(FArgs typ id) -> extendId typ id) args 
             mapM_ compileStm body
+            -- stack <- lookupAddr id
+            -- let stackString = show stack
+            -- emit $ -- ++ localsString
+            -- emit $ 
+            modify (\env -> env{code = code env ++  [".limit locals " ++ show (locals env)]})
+            modify (\env -> env{code = code env ++ [".limit stack " ++ show (stack env)]  })
+            modify (\env -> env{code = code env ++  [".method public static " ++ funString]})
             when (typ == TVoid) $ emit "return"
             emit "ireturn"
             emit' ".end method"
             emit ""
+
 
 emit :: Instruction -> State Env ()
 emit i = emit' $ " " ++ i
@@ -373,7 +408,8 @@ extendId typ id = do
     env <- get
     let (ctx:ctxs) = vars env
     let varPos = maxvar env
-    modify (\env -> env{vars = (Map.insert id varPos ctx):ctxs, maxvar = if typ == TDouble then  varPos + 2 else  varPos + 1})
+    let newLocals = if typ == TDouble then locals env + 2 else locals env + 1
+    modify (\env -> env{vars = (Map.insert id varPos ctx):ctxs, maxvar = if typ == TDouble then  varPos + 2 else  varPos + 1, locals = newLocals})
     return varPos
 
 extendFunc :: Env -> Func -> Env
@@ -412,7 +448,9 @@ emptyEnv className =  Env{
             code = [],
             labelCount = 0,
             funs = Map.empty,
-            className = className
+            className = className,
+            locals = 0,
+            stack = 0
 }
 newLabel :: String -> State Env Label
 newLabel labelName = do
