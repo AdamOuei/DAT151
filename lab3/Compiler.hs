@@ -168,12 +168,10 @@ compileExp' (ETyped exp typ) =
 
                     ECall id@(Id "printDouble") argExps -> do
                       mapM_ (compileExp TDouble) argExps
-                    
                       sig <- getSig id
                       emit $ "invokestatic " ++ sig  
                     ECall id argExps -> do
                       mapM_ compileExp' argExps
-                      emit $ ";;" ++ show argExps
                       sig <- getSig id
                       emit $ "invokestatic " ++ sig
                     EInc id -> do
@@ -186,7 +184,6 @@ compileExp' (ETyped exp typ) =
                                   emit $ "dadd"
                                   emit $ "dstore " ++ show addr
                                   modify (\env -> env{stack = 6 + stack env})
-
                         _ ->do emit $ "iload " ++ show addr
                                emit $ "iinc " ++ show addr ++ " 1"
                                modify (\env -> env{stack = 1 + stack env})
@@ -302,17 +299,15 @@ compileExp' (ETyped exp typ) =
                           integerCompare :: Type -> Exp -> Exp -> String -> State Env ()
                           integerCompare t exp1 exp2 op =
                             do
+                              emit "ldc 1"
                               compileExp t exp1
                               compileExp t exp2
-                              true <- newLabel "TRUE"
                               end <- newLabel "END"
-                              emit $ op ++ true
-                              emit "bipush 0 "
-                              emit $ "goto " ++ end
-                              emit $ true ++ ":"
-                              emit "bipush 1"
+                              emit $ op ++ end
+                              emit "pop"
+                              emit "bipush 0"
                               emit $ end ++ ":"
-                              modify (\env -> env{stack = 2 + stack env})
+                              modify (\env -> env{stack = 1 + stack env})
                           doubleCompare :: Type -> Exp -> Exp -> String -> State Env ()
                           doubleCompare t exp1 exp2 op = do 
                             compileExp t exp1
